@@ -7,15 +7,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Eorthus/shorturl/config"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupRouter() *chi.Mux {
+	cfg = &config.Config{
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080",
+	}
+
 	r := chi.NewRouter()
-	r.Post("/", HandlePost)
-	r.Get("/{shortID}", HandleGet)
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{shortID}", HandleGet)
+		r.Post("/", HandlePost)
+	})
+
 	return r
 }
 

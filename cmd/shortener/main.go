@@ -3,10 +3,13 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/Eorthus/shorturl/config"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -14,9 +17,12 @@ import (
 
 var (
 	urlMap = make(map[string]string)
+	cfg    *config.Config
 )
 
 func main() {
+	cfg = config.ParseFlags()
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
@@ -25,7 +31,8 @@ func main() {
 		r.Post("/", HandlePost)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Printf("Starting server on %s", cfg.ServerAddress)
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
 }
 
 func HandlePost(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +51,7 @@ func HandlePost(w http.ResponseWriter, r *http.Request) {
 	shortID := generateShortID()
 	urlMap[shortID] = longURL
 
-	shortURL := "http://localhost:8080/" + shortID
+	shortURL := fmt.Sprintf("%s/%s", cfg.BaseURL, shortID)
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(shortURL))
