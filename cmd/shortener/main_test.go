@@ -7,11 +7,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func setupRouter() *chi.Mux {
+	r := chi.NewRouter()
+	r.Post("/", HandlePost)
+	r.Get("/{shortID}", HandleGet)
+	return r
+}
+
 func TestHandlePost(t *testing.T) {
+	r := setupRouter()
+
 	tests := []struct {
 		name           string
 		url            string
@@ -29,9 +39,7 @@ func TestHandlePost(t *testing.T) {
 			require.NoError(t, err)
 
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(HandlePost)
-
-			handler.ServeHTTP(rr, req)
+			r.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
@@ -44,6 +52,8 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
+	r := setupRouter()
+
 	// Подготовка тестовых данных
 	urlMap["testid"] = "https://example.com"
 
@@ -54,7 +64,7 @@ func TestHandleGet(t *testing.T) {
 		expectedURL    string
 	}{
 		{"Existing short URL", "testid", http.StatusTemporaryRedirect, "https://example.com"},
-		{"Non-existing short URL", "nonexistent", http.StatusBadRequest, ""},
+		{"Non-existing short URL", "nonexistent", http.StatusNotFound, ""},
 	}
 
 	for _, tt := range tests {
@@ -63,9 +73,7 @@ func TestHandleGet(t *testing.T) {
 			require.NoError(t, err)
 
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(HandleGet)
-
-			handler.ServeHTTP(rr, req)
+			r.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
@@ -73,39 +81,6 @@ func TestHandleGet(t *testing.T) {
 				assert.Equal(t, tt.expectedURL, rr.Header().Get("Location"),
 					"handler returned unexpected location")
 			}
-		})
-	}
-}
-
-func TestHandleRequest(t *testing.T) {
-	tests := []struct {
-		name           string
-		method         string
-		expectedStatus int
-	}{
-		{"POST request", "POST", http.StatusCreated},
-		{"GET request", "GET", http.StatusBadRequest}, // Так как urlMap пуст для этого теста
-		{"Unsupported method", "PUT", http.StatusBadRequest},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var req *http.Request
-			var err error
-
-			if tt.method == "POST" {
-				req, err = http.NewRequest(tt.method, "/", bytes.NewBufferString("https://example.com"))
-			} else {
-				req, err = http.NewRequest(tt.method, "/", nil)
-			}
-			require.NoError(t, err)
-
-			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(HandleRequest)
-
-			handler.ServeHTTP(rr, req)
-
-			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 		})
 	}
 }

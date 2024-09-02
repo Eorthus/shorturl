@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 var (
@@ -14,24 +17,18 @@ var (
 )
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, HandleRequest)
-	log.Fatal(http.ListenAndServe(":8080", mux))
-}
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
 
-func HandleRequest(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		HandlePost(w, r)
-	case http.MethodGet:
-		HandleGet(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusBadRequest)
-	}
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{shortID}", HandleGet)
+		r.Post("/", HandlePost)
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 func HandlePost(w http.ResponseWriter, r *http.Request) {
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
@@ -54,16 +51,15 @@ func HandlePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleGet(w http.ResponseWriter, r *http.Request) {
-	shortID := strings.TrimPrefix(r.URL.Path, "/")
+	shortID := chi.URLParam(r, "shortID")
 	longURL, exists := urlMap[shortID]
 
 	if !exists {
-		http.Error(w, "Short URL not found", http.StatusBadRequest)
+		http.Error(w, "Short URL not found", http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Location", longURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
 }
 
 func generateShortID() string {
