@@ -15,22 +15,22 @@ var (
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, handleRequest)
+	mux.HandleFunc(`/`, HandleRequest)
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) {
+func HandleRequest(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		handlePost(w, r)
+		HandlePost(w, r)
 	case http.MethodGet:
-		handleGet(w, r)
+		HandleGet(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusBadRequest)
 	}
 }
 
-func handlePost(w http.ResponseWriter, r *http.Request) {
+func HandlePost(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -53,7 +53,7 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-func handleGet(w http.ResponseWriter, r *http.Request) {
+func HandleGet(w http.ResponseWriter, r *http.Request) {
 	shortID := strings.TrimPrefix(r.URL.Path, "/")
 	longURL, exists := urlMap[shortID]
 
