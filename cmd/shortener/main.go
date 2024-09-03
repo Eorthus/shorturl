@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -21,6 +22,8 @@ var (
 
 func main() {
 	cfg = config.ParseConfig()
+	config.DefineFlags(cfg)
+	flag.Parse() // Парсим флаги командной строки после их определения
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

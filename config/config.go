@@ -13,7 +13,7 @@ type Config struct {
 	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 }
 
-// ParseConfig инициализирует конфигурацию из переменных окружения и флагов командной строки
+// ParseConfig инициализирует конфигурацию из переменных окружения
 func ParseConfig() *Config {
 	cfg := &Config{}
 
@@ -22,12 +22,11 @@ func ParseConfig() *Config {
 		log.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
-	// Определение флагов командной строки
+	return cfg
+}
+
+// DefineFlags определяет флаги командной строки
+func DefineFlags(cfg *Config) {
 	flag.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")
 	flag.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")
-
-	// Парсинг флагов
-	flag.Parse()
-
-	return cfg
 }
