@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/Eorthus/shorturl/config"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -21,7 +20,7 @@ var (
 )
 
 func main() {
-	cfg = config.ParseFlags()
+	cfg = config.ParseConfig()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -32,6 +31,7 @@ func main() {
 	})
 
 	log.Printf("Starting server on %s", cfg.ServerAddress)
+	log.Printf("Using base URL: %s", cfg.BaseURL)
 	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
 }
 
