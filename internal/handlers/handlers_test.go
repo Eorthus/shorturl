@@ -16,8 +16,7 @@ import (
 
 func setupRouter(store *storage.InMemoryStorage) *chi.Mux {
 	cfg := &config.Config{
-		ServerAddress: "localhost:8080",
-		BaseURL:       "http://localhost:8080",
+		BaseURL: "http://localhost:8080",
 	}
 
 	handler := NewHandler(cfg.BaseURL, store)
