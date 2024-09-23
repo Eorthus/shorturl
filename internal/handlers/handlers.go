@@ -58,7 +58,6 @@ func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// New handler for POST /api/shorten
 func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		URL string `json:"url"`

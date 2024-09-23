@@ -31,12 +31,13 @@ func main() {
 	handler := handlers.NewHandler(cfg.BaseURL, store)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger(logger)) // Используем наш новый middleware
+	r.Use(middleware.Logger(logger))
+	r.Use(middleware.GzipMiddleware)
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Post("/", handler.HandlePost)
-		r.Post("/api/shorten", handler.HandleJSONPost) // Новый маршрут
+		r.Post("/api/shorten", handler.HandleJSONPost)
 	})
 
 	logger.Info("Starting server",
