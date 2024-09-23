@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,6 +26,7 @@ func setupRouter(store *storage.InMemoryStorage) *chi.Mux {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Post("/", handler.HandlePost)
+		r.Post("/api/shorten", handler.HandleJSONPost)
 	})
 
 	return r
@@ -93,6 +95,60 @@ func TestHandleGet(t *testing.T) {
 			if tt.expectedStatus == http.StatusTemporaryRedirect {
 				assert.Equal(t, tt.expectedURL, rr.Header().Get("Location"),
 					"handler returned unexpected location")
+			}
+		})
+	}
+}
+
+func TestHandleJSONPost(t *testing.T) {
+	store := storage.NewInMemoryStorage()
+	r := setupRouter(store)
+
+	tests := []struct {
+		name           string
+		requestBody    string
+		expectedStatus int
+		expectedPrefix string
+	}{
+		{
+			name:           "Valid URL",
+			requestBody:    `{"url": "https://practicum.yandex.ru"}`,
+			expectedStatus: http.StatusCreated,
+			expectedPrefix: `{"result":"http://localhost:8080/`,
+		},
+		{
+			name:           "Invalid JSON",
+			requestBody:    `{"url": "https://practicum.yandex.ru"`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid URL format",
+			requestBody:    `{"url": "not-a-url"}`,
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/api/shorten", bytes.NewBufferString(tt.requestBody))
+			require.NoError(t, err)
+
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
+
+			if tt.expectedStatus == http.StatusCreated {
+				var response map[string]string
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err, "Failed to unmarshal response")
+
+				result, ok := response["result"]
+				assert.True(t, ok, "Response doesn't contain 'result' key")
+				assert.True(t, strings.HasPrefix(result, "http://localhost:8080/"),
+					"handler returned unexpected body: got %v want prefix %v", result, "http://localhost:8080/")
 			}
 		})
 	}

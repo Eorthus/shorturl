@@ -36,6 +36,7 @@ func main() {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Post("/", handler.HandlePost)
+		r.Post("/api/shorten", handler.HandleJSONPost) // Новый маршрут
 	})
 
 	logger.Info("Starting server",
