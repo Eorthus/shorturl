@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"bytes"
@@ -7,30 +7,33 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Eorthus/shorturl/config"
-
+	"github.com/Eorthus/shorturl/internal/config"
+	"github.com/Eorthus/shorturl/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupRouter() *chi.Mux {
-	cfg = &config.Config{
+func setupRouter(store *storage.InMemoryStorage) *chi.Mux {
+	cfg := &config.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080",
 	}
 
+	handler := NewHandler(cfg.BaseURL, store)
+
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortID}", HandleGet)
-		r.Post("/", HandlePost)
+		r.Get("/{shortID}", handler.HandleGet)
+		r.Post("/", handler.HandlePost)
 	})
 
 	return r
 }
 
 func TestHandlePost(t *testing.T) {
-	r := setupRouter()
+	store := storage.NewInMemoryStorage()
+	r := setupRouter(store)
 
 	tests := []struct {
 		name           string
@@ -62,10 +65,11 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
-	r := setupRouter()
+	store := storage.NewInMemoryStorage()
+	r := setupRouter(store)
 
 	// Подготовка тестовых данных
-	urlMap["testid"] = "https://example.com"
+	store.SaveURL("testid", "https://example.com")
 
 	tests := []struct {
 		name           string

@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"log"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -14,15 +13,15 @@ type Config struct {
 }
 
 // ParseConfig инициализирует конфигурацию из переменных окружения
-func ParseConfig() *Config {
+func ParseConfig() (*Config, error) {
 	cfg := &Config{}
 
 	// Парсинг переменных окружения
 	if err := env.Parse(cfg); err != nil {
-		log.Fatalf("Failed to parse environment variables: %v", err)
+		return nil, err
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // DefineFlags определяет флаги командной строки

@@ -57,7 +57,10 @@ func TestParseConfig(t *testing.T) {
 			}()
 
 			// Инициализация конфигурации
-			cfg := ParseConfig()
+			cfg, err := ParseConfig() // Теперь мы обрабатываем два возвращаемых значения
+
+			// Проверка на отсутствие ошибки
+			assert.NoError(t, err, "ParseConfig should not return an error")
 
 			// Проверка значений
 			assert.Equal(t, tt.expectedAddr, cfg.ServerAddress, "ServerAddress mismatch")
