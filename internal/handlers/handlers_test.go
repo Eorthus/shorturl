@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,7 +17,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupRouter(store *storage.InMemoryStorage) *chi.Mux {
+func setupRouter(t *testing.T) (*chi.Mux, *storage.FileStorage, func()) {
+	tempDir, err := os.MkdirTemp("", "handlers_test")
+	require.NoError(t, err)
+
+	tempFile := filepath.Join(tempDir, "test_storage.json")
+
+	store, err := storage.NewFileStorage(tempFile)
+	require.NoError(t, err)
+
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
@@ -29,12 +39,16 @@ func setupRouter(store *storage.InMemoryStorage) *chi.Mux {
 		r.Post("/api/shorten", handler.HandleJSONPost)
 	})
 
-	return r
+	cleanup := func() {
+		os.RemoveAll(tempDir)
+	}
+
+	return r, store, cleanup
 }
 
 func TestHandlePost(t *testing.T) {
-	store := storage.NewInMemoryStorage()
-	r := setupRouter(store)
+	r, _, cleanup := setupRouter(t)
+	defer cleanup()
 
 	tests := []struct {
 		name           string
@@ -66,11 +80,12 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
-	store := storage.NewInMemoryStorage()
-	r := setupRouter(store)
+	r, store, cleanup := setupRouter(t)
+	defer cleanup()
 
 	// Подготовка тестовых данных
-	store.SaveURL("testid", "https://example.com")
+	err := store.SaveURL("testid", "https://example.com")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name           string
@@ -101,8 +116,8 @@ func TestHandleGet(t *testing.T) {
 }
 
 func TestHandleJSONPost(t *testing.T) {
-	store := storage.NewInMemoryStorage()
-	r := setupRouter(store)
+	r, _, cleanup := setupRouter(t)
+	defer cleanup()
 
 	tests := []struct {
 		name           string

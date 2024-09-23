@@ -25,9 +25,14 @@ func main() {
 	}
 
 	config.DefineFlags(cfg)
-	flag.Parse() // Парсим флаги командной строки после их определения
+	flag.Parse()              // Парсим флаги командной строки после их определения
+	config.ApplyPriority(cfg) // Применяем приоритет параметров
 
-	store := storage.NewInMemoryStorage()
+	store, err := storage.NewFileStorage(cfg.FileStoragePath)
+	if err != nil {
+		logger.Fatal("Failed to initialize storage", zap.Error(err))
+	}
+
 	handler := handlers.NewHandler(cfg.BaseURL, store)
 
 	r := chi.NewRouter()
@@ -43,6 +48,7 @@ func main() {
 	logger.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),
 		zap.String("base_url", cfg.BaseURL),
+		zap.String("file_storage_path", cfg.FileStoragePath),
 	)
 	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
 }

@@ -13,10 +13,10 @@ import (
 
 type Handler struct {
 	BaseURL string
-	Store   *storage.InMemoryStorage
+	Store   *storage.FileStorage
 }
 
-func NewHandler(baseURL string, store *storage.InMemoryStorage) *Handler {
+func NewHandler(baseURL string, store *storage.FileStorage) *Handler {
 	return &Handler{
 		BaseURL: baseURL,
 		Store:   store,
