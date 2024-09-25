@@ -1,8 +1,7 @@
-// internal/handlers/handlers.go
-
 package handlers
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -14,10 +13,10 @@ import (
 
 type Handler struct {
 	BaseURL string
-	Store   *storage.InMemoryStorage
+	Store   *storage.FileStorage
 }
 
-func NewHandler(baseURL string, store *storage.InMemoryStorage) *Handler {
+func NewHandler(baseURL string, store *storage.FileStorage) *Handler {
 	return &Handler{
 		BaseURL: baseURL,
 		Store:   store,
@@ -57,4 +56,35 @@ func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "Short URL not found", http.StatusNotFound)
 	}
+}
+
+func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		URL string `json:"url"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if !strings.HasPrefix(request.URL, "http://") && !strings.HasPrefix(request.URL, "https://") {
+		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		return
+	}
+
+	shortID := utils.GenerateShortID()
+	h.Store.SaveURL(shortID, request.URL)
+
+	shortURL := h.BaseURL + "/" + shortID
+
+	response := struct {
+		Result string `json:"result"`
+	}{
+		Result: shortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
