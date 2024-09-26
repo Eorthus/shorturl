@@ -7,6 +7,12 @@ import (
 	"sync"
 )
 
+// Storage defines the interface for URL storage operations
+type Storage interface {
+	SaveURL(shortID, longURL string) error
+	GetURL(shortID string) (string, bool)
+}
+
 type URLData struct {
 	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
@@ -19,7 +25,7 @@ type FileStorage struct {
 	mutex    sync.RWMutex
 }
 
-func NewFileStorage(filePath string) (*FileStorage, error) {
+func NewFileStorage(filePath string) (Storage, error) {
 	fs := &FileStorage{
 		filePath: filePath,
 		data:     make(map[string]URLData),

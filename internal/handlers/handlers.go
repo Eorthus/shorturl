@@ -13,10 +13,14 @@ import (
 
 type Handler struct {
 	BaseURL string
-	Store   *storage.FileStorage
+	Store   storage.Storage
 }
 
-func NewHandler(baseURL string, store *storage.FileStorage) *Handler {
+type ShortenResponse struct {
+	Result string `json:"result"`
+}
+
+func NewHandler(baseURL string, store storage.Storage) *Handler {
 	return &Handler{
 		BaseURL: baseURL,
 		Store:   store,
@@ -38,13 +42,16 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortID := utils.GenerateShortID()
-	h.Store.SaveURL(shortID, longURL)
+	err = h.Store.SaveURL(shortID, longURL)
+	if err != nil {
+		http.Error(w, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
 
 	shortURL := h.BaseURL + "/" + shortID
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-
 	w.Write([]byte(shortURL))
 }
 
@@ -74,15 +81,15 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortID := utils.GenerateShortID()
-	h.Store.SaveURL(shortID, request.URL)
+	err := h.Store.SaveURL(shortID, request.URL)
+	if err != nil {
+		http.Error(w, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
 
 	shortURL := h.BaseURL + "/" + shortID
 
-	response := struct {
-		Result string `json:"result"`
-	}{
-		Result: shortURL,
-	}
+	response := ShortenResponse{Result: shortURL}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

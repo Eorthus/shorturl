@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupRouter(t *testing.T) (*chi.Mux, *storage.FileStorage, func()) {
+func setupRouter(t *testing.T) (*chi.Mux, storage.Storage, func()) {
 	tempDir, err := os.MkdirTemp("", "handlers_test")
 	require.NoError(t, err)
 
