@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 type gzipWriter struct {
@@ -14,6 +15,12 @@ type gzipWriter struct {
 
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
+}
+
+var gzipWriterPool = sync.Pool{
+	New: func() interface{} {
+		return gzip.NewWriter(io.Discard)
+	},
 }
 
 func GzipMiddleware(next http.Handler) http.Handler {
@@ -32,8 +39,13 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		// Сжатие ответов
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			w.Header().Set("Content-Encoding", "gzip")
-			gz := gzip.NewWriter(w)
+
+			gz := gzipWriterPool.Get().(*gzip.Writer)
+			defer gzipWriterPool.Put(gz)
+
+			gz.Reset(w)
 			defer gz.Close()
+
 			gzw := gzipWriter{ResponseWriter: w, Writer: gz}
 			next.ServeHTTP(gzw, r)
 		} else {
