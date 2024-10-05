@@ -35,7 +35,7 @@ func TestDatabaseStorage(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"long_url"}).AddRow(longURL)
 		mockDB.EXPECT().
 			QueryRow("SELECT long_url FROM urls WHERE short_id = $1", shortID).
-			Return(mockSqlRow(rows))
+			Return(mockSQLRow(rows))
 
 		resultURL, exists := store.GetURL(shortID)
 		assert.True(t, exists)
@@ -47,7 +47,7 @@ func TestDatabaseStorage(t *testing.T) {
 
 		mockDB.EXPECT().
 			QueryRow("SELECT long_url FROM urls WHERE short_id = $1", shortID).
-			Return(mockSqlRow(sqlmock.NewRows([]string{"long_url"})))
+			Return(mockSQLRow(sqlmock.NewRows([]string{"long_url"})))
 
 		resultURL, exists := store.GetURL(shortID)
 		assert.False(t, exists)
@@ -56,7 +56,7 @@ func TestDatabaseStorage(t *testing.T) {
 }
 
 // mockSqlRow создает мок для sql.Row
-func mockSqlRow(rows *sqlmock.Rows) *sql.Row {
+func mockSQLRow(rows *sqlmock.Rows) *sql.Row {
 	db, mock, _ := sqlmock.New()
 	mock.ExpectQuery("").WillReturnRows(rows)
 	return db.QueryRow("")
