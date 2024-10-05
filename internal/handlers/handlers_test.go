@@ -37,6 +37,7 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage, func()) {
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Post("/", handler.HandlePost)
 		r.Post("/api/shorten", handler.HandleJSONPost)
+		r.Get("/ping", handler.HandlePing) // Добавляем маршрут для /ping
 	})
 
 	cleanup := func() {
@@ -166,5 +167,28 @@ func TestHandleJSONPost(t *testing.T) {
 					"handler returned unexpected body: got %v want prefix %v", result, "http://localhost:8080/")
 			}
 		})
+	}
+}
+
+func TestHandlePing(t *testing.T) {
+	r, _, cleanup := setupRouter(t)
+	defer cleanup()
+
+	req, err := http.NewRequest("GET", "/ping", nil)
+	require.NoError(t, err)
+
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	// Проверка на успешный статус
+	assert.Equal(t, http.StatusOK, rr.Code, "handler should return 200 OK for successful ping")
+
+	// Проверка на тело ответа
+	if rr.Code == http.StatusOK {
+		assert.Equal(t, "Pong", rr.Body.String(), "Expected 'Pong' in response body")
+	} else {
+		// Если статус не 200, оставляем старую логику проверки ошибки
+		assert.Equal(t, http.StatusInternalServerError, rr.Code, "handler should return 500 for failed ping")
+		assert.Equal(t, "Database connection failed\n", rr.Body.String())
 	}
 }

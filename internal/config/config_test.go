@@ -15,6 +15,7 @@ func TestParseConfig(t *testing.T) {
 		expectedAddr     string
 		expectedBaseURL  string
 		expectedFilePath string
+		expectedDBDSN    string
 	}{
 		{
 			name:             "Defaults",
@@ -22,6 +23,7 @@ func TestParseConfig(t *testing.T) {
 			expectedAddr:     "localhost:8080",
 			expectedBaseURL:  "http://localhost:8080",
 			expectedFilePath: "url_storage.json",
+			expectedDBDSN:    "",
 		},
 		{
 			name: "WithEnvVariables",
@@ -29,10 +31,12 @@ func TestParseConfig(t *testing.T) {
 				"SERVER_ADDRESS":    "localhost:8081",
 				"BASE_URL":          "http://shortener.com",
 				"FILE_STORAGE_PATH": "/tmp/storage.json",
+				"DATABASE_DSN":      "postgres://user:pass@localhost:5432/dbname",
 			},
 			expectedAddr:     "localhost:8081",
 			expectedBaseURL:  "http://shortener.com",
 			expectedFilePath: "/tmp/storage.json",
+			expectedDBDSN:    "postgres://user:pass@localhost:5432/dbname",
 		},
 	}
 
@@ -70,6 +74,7 @@ func TestParseConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedAddr, cfg.ServerAddress, "ServerAddress mismatch")
 			assert.Equal(t, tt.expectedBaseURL, cfg.BaseURL, "BaseURL mismatch")
 			assert.Equal(t, tt.expectedFilePath, cfg.FileStoragePath, "FileStoragePath mismatch")
+			assert.Equal(t, tt.expectedDBDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
 		})
 	}
 }
@@ -83,20 +88,23 @@ func TestDefineFlags(t *testing.T) {
 		ServerAddress:   "localhost:8080",
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "url_storage.json",
+		DatabaseDSN:     "",
 	}
 
 	// Определяем флаги на основе новой FlagSet
 	flagSet.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")
 	flagSet.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")
 	flagSet.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data")
+	flagSet.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database DSN")
 
 	// Устанавливаем значения флагов как если бы они были переданы в командной строке
-	flagSet.Parse([]string{"-a=localhost:7070", "-b=http://test.com", "-f=/tmp/test_storage.json"})
+	flagSet.Parse([]string{"-a=localhost:7070", "-b=http://test.com", "-f=/tmp/test_storage.json", "-d=postgres://test:test@localhost:5432/testdb"})
 
 	// Проверяем, что значения были правильно обновлены
 	assert.Equal(t, "localhost:7070", cfg.ServerAddress, "ServerAddress mismatch")
 	assert.Equal(t, "http://test.com", cfg.BaseURL, "BaseURL mismatch")
 	assert.Equal(t, "/tmp/test_storage.json", cfg.FileStoragePath, "FileStoragePath mismatch")
+	assert.Equal(t, "postgres://test:test@localhost:5432/testdb", cfg.DatabaseDSN, "DatabaseDSN mismatch")
 }
 
 func TestApplyPriority(t *testing.T) {
@@ -113,11 +121,13 @@ func TestApplyPriority(t *testing.T) {
 				ServerAddress:   "localhost:8080",
 				BaseURL:         "http://localhost:8080",
 				FileStoragePath: "url_storage.json",
+				DatabaseDSN:     "",
 			},
 			expectedConfig: Config{
 				ServerAddress:   "localhost:8080",
 				BaseURL:         "http://localhost:8080",
 				FileStoragePath: "url_storage.json",
+				DatabaseDSN:     "",
 			},
 		},
 		{
@@ -126,32 +136,38 @@ func TestApplyPriority(t *testing.T) {
 				"SERVER_ADDRESS":    "localhost:8081",
 				"BASE_URL":          "http://example.com",
 				"FILE_STORAGE_PATH": "/data/storage.json",
+				"DATABASE_DSN":      "postgres://user:pass@localhost:5432/dbname",
 			},
 			initialConfig: Config{
 				ServerAddress:   "localhost:8080",
 				BaseURL:         "http://localhost:8080",
 				FileStoragePath: "url_storage.json",
+				DatabaseDSN:     "",
 			},
 			expectedConfig: Config{
 				ServerAddress:   "localhost:8081",
 				BaseURL:         "http://example.com",
 				FileStoragePath: "/data/storage.json",
+				DatabaseDSN:     "postgres://user:pass@localhost:5432/dbname",
 			},
 		},
 		{
 			name: "PartialEnvVariables",
 			envVars: map[string]string{
 				"SERVER_ADDRESS": "localhost:9090",
+				"DATABASE_DSN":   "postgres://user:pass@localhost:5432/testdb",
 			},
 			initialConfig: Config{
 				ServerAddress:   "localhost:8080",
 				BaseURL:         "http://localhost:8080",
 				FileStoragePath: "url_storage.json",
+				DatabaseDSN:     "",
 			},
 			expectedConfig: Config{
 				ServerAddress:   "localhost:9090",
 				BaseURL:         "http://localhost:8080",
 				FileStoragePath: "url_storage.json",
+				DatabaseDSN:     "postgres://user:pass@localhost:5432/testdb",
 			},
 		},
 	}
@@ -190,6 +206,7 @@ func TestApplyPriority(t *testing.T) {
 			assert.Equal(t, tt.expectedConfig.ServerAddress, cfg.ServerAddress, "ServerAddress mismatch")
 			assert.Equal(t, tt.expectedConfig.BaseURL, cfg.BaseURL, "BaseURL mismatch")
 			assert.Equal(t, tt.expectedConfig.FileStoragePath, cfg.FileStoragePath, "FileStoragePath mismatch")
+			assert.Equal(t, tt.expectedConfig.DatabaseDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
 		})
 	}
 }

@@ -30,27 +30,33 @@ func main() {
 	config.ApplyPriority(cfg) // Применяем приоритет параметров
 
 	// Инициализация хранилища
-	store, err := storage.NewFileStorage(cfg.FileStoragePath)
-	if err != nil {
-		zapLogger.Fatal("Failed to initialize storage", zap.Error(err))
+	var store storage.Storage
+	if cfg.DatabaseDSN != "" {
+		dbStorage, err := storage.NewDatabaseStorage(cfg.DatabaseDSN)
+		if err != nil {
+			zapLogger.Fatal("Failed to initialize database storage", zap.Error(err))
+		}
+		defer dbStorage.Close()
+		store = dbStorage
+	} else {
+		fileStorage, err := storage.NewFileStorage(cfg.FileStoragePath)
+		if err != nil {
+			zapLogger.Fatal("Failed to initialize file storage", zap.Error(err))
+		}
+		store = fileStorage
 	}
 
-	// Создание обработчика
 	handler := handlers.NewHandler(cfg.BaseURL, store)
 
-	// Инициализация роутера
 	r := chi.NewRouter()
 
-	// Применяем общий логгер для всех запросов
 	r.Use(logger.Logger(zapLogger))
-
-	// Применяем сжатие gzip
 	r.Use(middleware.GzipMiddleware)
 
-	// Применяем логгер для всех GET запросов
 	r.Group(func(r chi.Router) {
 		r.Use(logger.GETLogger(zapLogger))
 		r.Get("/{shortID}", handler.HandleGet)
+		r.Get("/ping", handler.HandlePing)
 	})
 
 	// Применяем логгер для всех POST запросов
@@ -65,6 +71,7 @@ func main() {
 		zap.String("address", cfg.ServerAddress),
 		zap.String("base_url", cfg.BaseURL),
 		zap.String("file_storage_path", cfg.FileStoragePath),
+		zap.String("database_dsn", cfg.DatabaseDSN),
 	)
 
 	// Запуск HTTP-сервера
