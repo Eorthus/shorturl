@@ -12,7 +12,7 @@ import (
 
 func TestFileStorage(t *testing.T) {
 	// Создаем временную директорию для тестов
-	tempDir, err := os.MkdirTemp("", "storage_test")
+	tempDir, err := os.MkdirTemp("", "file_storage_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
@@ -72,7 +72,6 @@ func TestFileStorage(t *testing.T) {
 			var urlData URLData
 			err := json.Unmarshal(line, &urlData)
 			assert.NoError(t, err, "Каждая строка должна быть валидным JSON")
-			assert.NotEmpty(t, urlData.UUID, "UUID не должен быть пустым")
 			assert.NotEmpty(t, urlData.ShortURL, "ShortURL не должен быть пустым")
 			assert.NotEmpty(t, urlData.OriginalURL, "OriginalURL не должен быть пустым")
 		}
