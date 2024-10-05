@@ -19,7 +19,12 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 		data:     make(map[string]URLData),
 	}
 
-	if err := fs.loadFromFile(); err != nil {
+	// Проверяем существование файла, но не создаем его
+	if _, err := os.Stat(filePath); err == nil {
+		if err := fs.loadFromFile(); err != nil {
+			return nil, err
+		}
+	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
 
@@ -52,8 +57,13 @@ func (fs *FileStorage) GetURL(shortID string) (string, bool) {
 	return urlData.OriginalURL, true
 }
 
+func (fs *FileStorage) Ping() error {
+	_, err := os.Stat(fs.filePath)
+	return err
+}
+
 func (fs *FileStorage) loadFromFile() error {
-	file, err := os.OpenFile(fs.filePath, os.O_RDONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(fs.filePath, os.O_RDONLY, 0666)
 	if err != nil {
 		return err
 	}

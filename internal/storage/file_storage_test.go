@@ -76,6 +76,36 @@ func TestFileStorage(t *testing.T) {
 			assert.NotEmpty(t, urlData.OriginalURL, "OriginalURL не должен быть пустым")
 		}
 	})
+
+	t.Run("Ping", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "file_storage_ping_test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		tempFile := filepath.Join(tempDir, "test_storage.json")
+		store, err := NewFileStorage(tempFile)
+		require.NoError(t, err)
+
+		// Файл еще не создан, Ping должен вернуть ошибку
+		err = store.Ping()
+		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
+
+		// Сохраняем URL, чтобы создать файл
+		err = store.SaveURL("test", "https://example.com")
+		require.NoError(t, err)
+
+		// Теперь файл должен существовать, и Ping должен быть успешным
+		err = store.Ping()
+		assert.NoError(t, err, "Ping должен быть успешным для существующего файла")
+
+		// Проверка на другой несуществующий файл
+		nonExistentFile := filepath.Join(tempDir, "non_existent.json")
+		storeFail, err := NewFileStorage(nonExistentFile)
+		require.NoError(t, err)
+
+		err = storeFail.Ping()
+		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
+	})
 }
 
 // splitLines разделяет байтовый срез на строки

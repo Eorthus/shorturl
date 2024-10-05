@@ -30,7 +30,25 @@ func NewDatabaseStorage(dsn string) (*DatabaseStorage, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &DatabaseStorage{db: db}, nil
+	storage := &DatabaseStorage{db: db}
+	if err := storage.createTable(); err != nil {
+		return nil, fmt.Errorf("failed to create table: %w", err)
+	}
+
+	return storage, nil
+}
+
+func (s *DatabaseStorage) createTable() error {
+	query := `
+	CREATE TABLE IF NOT EXISTS urls (
+		id SERIAL PRIMARY KEY,
+		short_id VARCHAR(10) UNIQUE NOT NULL,
+		original_url TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	_, err := s.db.Exec(query)
+	return err
 }
 
 func (s *DatabaseStorage) Close() error {
@@ -42,13 +60,13 @@ func (s *DatabaseStorage) Ping() error {
 }
 
 func (s *DatabaseStorage) SaveURL(shortID, longURL string) error {
-	_, err := s.db.Exec("INSERT INTO urls (short_id, long_url) VALUES ($1, $2)", shortID, longURL)
+	_, err := s.db.Exec("INSERT INTO urls (short_id, original_url) VALUES ($1, $2)", shortID, longURL)
 	return err
 }
 
 func (s *DatabaseStorage) GetURL(shortID string) (string, bool) {
 	var longURL string
-	err := s.db.QueryRow("SELECT long_url FROM urls WHERE short_id = $1", shortID).Scan(&longURL)
+	err := s.db.QueryRow("SELECT original_url FROM urls WHERE short_id = $1", shortID).Scan(&longURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", false

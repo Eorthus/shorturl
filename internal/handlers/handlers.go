@@ -97,12 +97,8 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
-	if dbStorage, ok := h.Store.(*storage.DatabaseStorage); ok {
-		if err := dbStorage.Ping(); err != nil {
-			http.Error(w, "Database connection failed", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+	if err := h.Store.Ping(); err != nil {
+		http.Error(w, "Storage connection failed", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

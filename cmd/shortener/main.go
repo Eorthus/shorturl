@@ -31,6 +31,7 @@ func main() {
 
 	// Инициализация хранилища
 	var store storage.Storage
+
 	if cfg.DatabaseDSN != "" {
 		dbStorage, err := storage.NewDatabaseStorage(cfg.DatabaseDSN)
 		if err != nil {
@@ -38,12 +39,15 @@ func main() {
 		}
 		defer dbStorage.Close()
 		store = dbStorage
-	} else {
+	} else if cfg.FileStoragePath != "" {
 		fileStorage, err := storage.NewFileStorage(cfg.FileStoragePath)
 		if err != nil {
 			zapLogger.Fatal("Failed to initialize file storage", zap.Error(err))
 		}
 		store = fileStorage
+	} else {
+		zapLogger.Info("Using in-memory storage")
+		store = storage.NewMemoryStorage()
 	}
 
 	handler := handlers.NewHandler(cfg.BaseURL, store)

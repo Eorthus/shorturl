@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,15 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupRouter(t *testing.T) (*chi.Mux, storage.Storage, func()) {
-	tempDir, err := os.MkdirTemp("", "handlers_test")
-	require.NoError(t, err)
-
-	tempFile := filepath.Join(tempDir, "test_storage.json")
-
-	store, err := storage.NewFileStorage(tempFile)
-	require.NoError(t, err)
-
+func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
+	store := storage.NewMemoryStorage()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
@@ -40,16 +31,11 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage, func()) {
 		r.Get("/ping", handler.HandlePing) // Добавляем маршрут для /ping
 	})
 
-	cleanup := func() {
-		os.RemoveAll(tempDir)
-	}
-
-	return r, store, cleanup
+	return r, store
 }
 
 func TestHandlePost(t *testing.T) {
-	r, _, cleanup := setupRouter(t)
-	defer cleanup()
+	r, _ := setupRouter(t)
 
 	tests := []struct {
 		name           string
@@ -81,11 +67,12 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
-	r, store, cleanup := setupRouter(t)
-	defer cleanup()
+	r, store := setupRouter(t)
 
 	// Подготовка тестовых данных
-	err := store.SaveURL("testid", "https://example.com")
+	shortID := "testid"
+	longURL := "https://example.com"
+	err := store.SaveURL(shortID, longURL)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -94,7 +81,7 @@ func TestHandleGet(t *testing.T) {
 		expectedStatus int
 		expectedURL    string
 	}{
-		{"Existing short URL", "testid", http.StatusTemporaryRedirect, "https://example.com"},
+		{"Existing short URL", shortID, http.StatusTemporaryRedirect, longURL},
 		{"Non-existing short URL", "nonexistent", http.StatusNotFound, ""},
 	}
 
@@ -117,8 +104,7 @@ func TestHandleGet(t *testing.T) {
 }
 
 func TestHandleJSONPost(t *testing.T) {
-	r, _, cleanup := setupRouter(t)
-	defer cleanup()
+	r, _ := setupRouter(t)
 
 	tests := []struct {
 		name           string
@@ -171,8 +157,7 @@ func TestHandleJSONPost(t *testing.T) {
 }
 
 func TestHandlePing(t *testing.T) {
-	r, _, cleanup := setupRouter(t)
-	defer cleanup()
+	r, _ := setupRouter(t)
 
 	req, err := http.NewRequest("GET", "/ping", nil)
 	require.NoError(t, err)
@@ -180,15 +165,6 @@ func TestHandlePing(t *testing.T) {
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
 
-	// Проверка на успешный статус
-	assert.Equal(t, http.StatusOK, rr.Code, "handler should return 200 OK for successful ping")
-
-	// Проверка на тело ответа
-	if rr.Code == http.StatusOK {
-		assert.Equal(t, "Pong", rr.Body.String(), "Expected 'Pong' in response body")
-	} else {
-		// Если статус не 200, оставляем старую логику проверки ошибки
-		assert.Equal(t, http.StatusInternalServerError, rr.Code, "handler should return 500 for failed ping")
-		assert.Equal(t, "Database connection failed\n", rr.Body.String())
-	}
+	assert.Equal(t, http.StatusOK, rr.Code, "handler should return 200 OK for ping")
+	assert.Equal(t, "Pong", rr.Body.String(), "Expected 'Pong' in response body")
 }

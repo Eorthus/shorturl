@@ -4,6 +4,7 @@ package storage
 type Storage interface {
 	SaveURL(shortID, longURL string) error
 	GetURL(shortID string) (string, bool)
+	Ping() error
 }
 
 // URLData represents the structure for storing URL data
