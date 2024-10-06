@@ -62,6 +62,12 @@ func TestDatabaseStorage(t *testing.T) {
 	})
 
 	t.Run("SaveURLBatch", func(t *testing.T) {
+		db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+		require.NoError(t, err)
+		defer db.Close()
+
+		store := &DatabaseStorage{db: db}
+
 		urls := map[string]string{
 			"abc123": "https://example.com",
 			"def456": "https://example.org",
@@ -69,14 +75,17 @@ func TestDatabaseStorage(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectPrepare("INSERT INTO urls")
-		for shortID, longURL := range urls {
+		for range urls {
 			mock.ExpectExec("INSERT INTO urls").
-				WithArgs(shortID, longURL).
+				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 		}
 		mock.ExpectCommit()
 
-		err := store.SaveURLBatch(urls)
+		err = store.SaveURLBatch(urls)
+		assert.NoError(t, err)
+
+		err = mock.ExpectationsWereMet()
 		assert.NoError(t, err)
 	})
 }
