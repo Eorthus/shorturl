@@ -36,3 +36,14 @@ func (ms *MemoryStorage) Ping() error {
 func (ms *MemoryStorage) Close() error {
 	return nil // No need to close memory storage
 }
+
+func (ms *MemoryStorage) SaveURLBatch(urls map[string]string) error {
+	ms.mutex.Lock()
+	defer ms.mutex.Unlock()
+
+	for shortID, longURL := range urls {
+		ms.data[shortID] = longURL
+	}
+
+	return nil
+}

@@ -99,3 +99,17 @@ func (fs *FileStorage) saveToFile() error {
 
 	return writer.Flush()
 }
+
+func (fs *FileStorage) SaveURLBatch(urls map[string]string) error {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	for shortID, longURL := range urls {
+		fs.data[shortID] = URLData{
+			ShortURL:    shortID,
+			OriginalURL: longURL,
+		}
+	}
+
+	return fs.saveToFile()
+}

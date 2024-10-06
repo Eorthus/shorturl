@@ -68,6 +68,7 @@ func main() {
 		r.Use(logger.POSTLogger(zapLogger))
 		r.Post("/", handler.HandlePost)
 		r.Post("/api/shorten", handler.HandleJSONPost)
+		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
 	})
 
 	// Логируем старт сервера

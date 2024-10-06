@@ -14,6 +14,7 @@ type DBInterface interface {
 	QueryRow(query string, args ...interface{}) *sql.Row
 	Ping() error
 	Close() error
+	Begin() (*sql.Tx, error)
 }
 
 type DatabaseStorage struct {
@@ -74,4 +75,27 @@ func (s *DatabaseStorage) GetURL(shortID string) (string, bool) {
 		return "", false
 	}
 	return longURL, true
+}
+
+func (s *DatabaseStorage) SaveURLBatch(urls map[string]string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("INSERT INTO urls (short_id, original_url) VALUES ($1, $2)")
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for shortID, longURL := range urls {
+		_, err = stmt.Exec(shortID, longURL)
+		if err != nil {
+			return fmt.Errorf("failed to execute statement: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }

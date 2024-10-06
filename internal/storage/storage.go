@@ -5,6 +5,7 @@ type Storage interface {
 	SaveURL(shortID, longURL string) error
 	GetURL(shortID string) (string, bool)
 	Ping() error
+	SaveURLBatch(urls map[string]string) error
 }
 
 // URLData represents the structure for storing URL data

@@ -34,6 +34,21 @@ func (m *MockDBInterface) EXPECT() *MockDBInterfaceMockRecorder {
 	return m.recorder
 }
 
+// Begin mocks base method.
+func (m *MockDBInterface) Begin() (*sql.Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Begin")
+	ret0, _ := ret[0].(*sql.Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Begin indicates an expected call of Begin.
+func (mr *MockDBInterfaceMockRecorder) Begin() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*MockDBInterface)(nil).Begin))
+}
+
 // Close mocks base method.
 func (m *MockDBInterface) Close() error {
 	m.ctrl.T.Helper()

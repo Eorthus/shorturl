@@ -20,6 +20,16 @@ type ShortenResponse struct {
 	Result string `json:"result"`
 }
 
+type BatchRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
 func NewHandler(baseURL string, store storage.Storage) *Handler {
 	return &Handler{
 		BaseURL: baseURL,
@@ -103,4 +113,45 @@ func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Pong"))
+}
+
+func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
+	var requests []BatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(requests) == 0 {
+		http.Error(w, "Empty batch", http.StatusBadRequest)
+		return
+	}
+
+	urlMap := make(map[string]string, len(requests))
+	responses := make([]BatchResponse, 0, len(requests))
+
+	for _, req := range requests {
+		if !strings.HasPrefix(req.OriginalURL, "http://") && !strings.HasPrefix(req.OriginalURL, "https://") {
+			http.Error(w, "Invalid URL format", http.StatusBadRequest)
+			return
+		}
+
+		shortID := utils.GenerateShortID()
+		urlMap[shortID] = req.OriginalURL
+		shortURL := h.BaseURL + "/" + shortID
+		responses = append(responses, BatchResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      shortURL,
+		})
+	}
+
+	err := h.Store.SaveURLBatch(urlMap)
+	if err != nil {
+		http.Error(w, "Error saving URLs", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(responses)
 }
