@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,15 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupRouter(t *testing.T) (*chi.Mux, *storage.FileStorage, func()) {
-	tempDir, err := os.MkdirTemp("", "handlers_test")
+func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
+	ctx := context.Background()
+	store, err := storage.NewMemoryStorage(ctx)
 	require.NoError(t, err)
-
-	tempFile := filepath.Join(tempDir, "test_storage.json")
-
-	store, err := storage.NewFileStorage(tempFile)
-	require.NoError(t, err)
-
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
@@ -37,18 +31,15 @@ func setupRouter(t *testing.T) (*chi.Mux, *storage.FileStorage, func()) {
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Post("/", handler.HandlePost)
 		r.Post("/api/shorten", handler.HandleJSONPost)
+		r.Get("/ping", handler.HandlePing)
+		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
 	})
 
-	cleanup := func() {
-		os.RemoveAll(tempDir)
-	}
-
-	return r, store, cleanup
+	return r, store
 }
 
 func TestHandlePost(t *testing.T) {
-	r, _, cleanup := setupRouter(t)
-	defer cleanup()
+	r, _ := setupRouter(t)
 
 	tests := []struct {
 		name           string
@@ -80,11 +71,12 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
-	r, store, cleanup := setupRouter(t)
-	defer cleanup()
+	r, store := setupRouter(t)
 
-	// Подготовка тестовых данных
-	err := store.SaveURL("testid", "https://example.com")
+	ctx := context.Background()
+	shortID := "testid"
+	longURL := "https://example.com"
+	err := store.SaveURL(ctx, shortID, longURL)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -93,7 +85,7 @@ func TestHandleGet(t *testing.T) {
 		expectedStatus int
 		expectedURL    string
 	}{
-		{"Existing short URL", "testid", http.StatusTemporaryRedirect, "https://example.com"},
+		{"Existing short URL", shortID, http.StatusTemporaryRedirect, longURL},
 		{"Non-existing short URL", "nonexistent", http.StatusNotFound, ""},
 	}
 
@@ -116,8 +108,7 @@ func TestHandleGet(t *testing.T) {
 }
 
 func TestHandleJSONPost(t *testing.T) {
-	r, _, cleanup := setupRouter(t)
-	defer cleanup()
+	r, _ := setupRouter(t)
 
 	tests := []struct {
 		name           string
@@ -164,6 +155,77 @@ func TestHandleJSONPost(t *testing.T) {
 				assert.True(t, ok, "Response doesn't contain 'result' key")
 				assert.True(t, strings.HasPrefix(result, "http://localhost:8080/"),
 					"handler returned unexpected body: got %v want prefix %v", result, "http://localhost:8080/")
+			}
+		})
+	}
+}
+
+func TestHandlePing(t *testing.T) {
+	r, _ := setupRouter(t)
+
+	req, err := http.NewRequest("GET", "/ping", nil)
+	require.NoError(t, err)
+
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code, "handler should return 200 OK for ping")
+	assert.Equal(t, "Pong", rr.Body.String(), "Expected 'Pong' in response body")
+}
+
+func TestHandleBatchShorten(t *testing.T) {
+	r, _ := setupRouter(t)
+
+	tests := []struct {
+		name           string
+		requestBody    string
+		expectedStatus int
+	}{
+		{
+			name: "Valid batch",
+			requestBody: `[
+				{"correlation_id": "1", "original_url": "https://example.com"},
+				{"correlation_id": "2", "original_url": "https://example.org"}
+			]`,
+			expectedStatus: http.StatusCreated,
+		},
+		{
+			name:           "Empty batch",
+			requestBody:    `[]`,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "Invalid URL in batch",
+			requestBody: `[
+				{"correlation_id": "1", "original_url": "not-a-url"}
+			]`,
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/api/shorten/batch", bytes.NewBufferString(tt.requestBody))
+			require.NoError(t, err)
+
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
+
+			if tt.expectedStatus == http.StatusCreated {
+				var response []BatchResponse
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err, "Failed to unmarshal response")
+
+				assert.Len(t, response, 2, "Expected 2 items in response")
+				for _, item := range response {
+					assert.NotEmpty(t, item.CorrelationID, "CorrelationID should not be empty")
+					assert.True(t, strings.HasPrefix(item.ShortURL, "http://localhost:8080/"),
+						"ShortURL should start with base URL")
+				}
 			}
 		})
 	}
