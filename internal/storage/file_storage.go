@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"bufio"
+	"context"
 	"encoding/json"
 	"os"
 	"sync"
@@ -13,7 +13,7 @@ type FileStorage struct {
 	mutex    sync.RWMutex
 }
 
-func NewFileStorage(filePath string) (*FileStorage, error) {
+func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
 		filePath: filePath,
 		data:     make(map[string]URLData),
@@ -21,7 +21,7 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 
 	// Проверяем существование файла, но не создаем его
 	if _, err := os.Stat(filePath); err == nil {
-		if err := fs.loadFromFile(); err != nil {
+		if err := fs.loadFromFile(ctx); err != nil {
 			return nil, err
 		}
 	} else if !os.IsNotExist(err) {
@@ -31,7 +31,7 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveURL(shortID, longURL string) error {
+func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -42,10 +42,10 @@ func (fs *FileStorage) SaveURL(shortID, longURL string) error {
 
 	fs.data[shortID] = urlData
 
-	return fs.saveToFile()
+	return fs.saveToFile(ctx)
 }
 
-func (fs *FileStorage) GetURL(shortID string) (string, bool) {
+func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
@@ -57,50 +57,7 @@ func (fs *FileStorage) GetURL(shortID string) (string, bool) {
 	return urlData.OriginalURL, true
 }
 
-func (fs *FileStorage) Ping() error {
-	_, err := os.Stat(fs.filePath)
-	return err
-}
-
-func (fs *FileStorage) loadFromFile() error {
-	file, err := os.OpenFile(fs.filePath, os.O_RDONLY, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var urlData URLData
-		if err := json.Unmarshal(scanner.Bytes(), &urlData); err != nil {
-			return err
-		}
-		fs.data[urlData.ShortURL] = urlData
-	}
-
-	return scanner.Err()
-}
-
-func (fs *FileStorage) saveToFile() error {
-	file, err := os.OpenFile(fs.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	encoder := json.NewEncoder(writer)
-
-	for _, urlData := range fs.data {
-		if err := encoder.Encode(urlData); err != nil {
-			return err
-		}
-	}
-
-	return writer.Flush()
-}
-
-func (fs *FileStorage) SaveURLBatch(urls map[string]string) error {
+func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -111,5 +68,64 @@ func (fs *FileStorage) SaveURLBatch(urls map[string]string) error {
 		}
 	}
 
-	return fs.saveToFile()
+	return fs.saveToFile(ctx)
+}
+
+func (fs *FileStorage) Ping(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		_, err := os.Stat(fs.filePath)
+		if os.IsNotExist(err) {
+			return err // Явно возвращаем ошибку, если файл не существует
+		}
+		return nil
+	}
+}
+
+func (fs *FileStorage) saveToFile(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		file, err := os.OpenFile(fs.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		encoder := json.NewEncoder(file)
+		for _, urlData := range fs.data {
+			if err := encoder.Encode(urlData); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+func (fs *FileStorage) loadFromFile(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		file, err := os.OpenFile(fs.filePath, os.O_RDONLY|os.O_CREATE, 0666)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		decoder := json.NewDecoder(file)
+		for decoder.More() {
+			var urlData URLData
+			if err := decoder.Decode(&urlData); err != nil {
+				return err
+			}
+			fs.data[urlData.ShortURL] = urlData
+		}
+
+		return nil
+	}
 }

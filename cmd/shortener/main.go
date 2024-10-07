@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Eorthus/shorturl/internal/config"
 	"github.com/Eorthus/shorturl/internal/handlers"
@@ -31,23 +33,28 @@ func main() {
 
 	// Инициализация хранилища
 	var store storage.Storage
+	ctx := context.Background()
 
 	if cfg.DatabaseDSN != "" {
-		dbStorage, err := storage.NewDatabaseStorage(cfg.DatabaseDSN)
+		dbStorage, err := storage.NewDatabaseStorage(ctx, cfg.DatabaseDSN)
 		if err != nil {
 			zapLogger.Fatal("Failed to initialize database storage", zap.Error(err))
 		}
 		defer dbStorage.Close()
 		store = dbStorage
 	} else if cfg.FileStoragePath != "" {
-		fileStorage, err := storage.NewFileStorage(cfg.FileStoragePath)
+		fileStorage, err := storage.NewFileStorage(ctx, cfg.FileStoragePath)
 		if err != nil {
 			zapLogger.Fatal("Failed to initialize file storage", zap.Error(err))
 		}
 		store = fileStorage
 	} else {
 		zapLogger.Info("Using in-memory storage")
-		store = storage.NewMemoryStorage()
+		memStorage, err := storage.NewMemoryStorage(ctx)
+		if err != nil {
+			zapLogger.Fatal("Failed to initialize memory storage", zap.Error(err))
+		}
+		store = memStorage
 	}
 
 	handler := handlers.NewHandler(cfg.BaseURL, store)
@@ -56,6 +63,8 @@ func main() {
 
 	r.Use(logger.Logger(zapLogger))
 	r.Use(middleware.GzipMiddleware)
+	r.Use(middleware.ApiContextMiddleware(10 * time.Second))
+	r.Use(middleware.DBContextMiddleware(store))
 
 	r.Group(func(r chi.Router) {
 		r.Use(logger.GETLogger(zapLogger))

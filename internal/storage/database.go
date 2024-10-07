@@ -1,45 +1,45 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	_ "github.com/lib/pq"
 )
 
-//go:generate mockgen -source=database.go -destination=mock_database.go -package=storage
-
 type DBInterface interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
-	Ping() error
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	PingContext(ctx context.Context) error
 	Close() error
 	Begin() (*sql.Tx, error)
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
 type DatabaseStorage struct {
 	db DBInterface
 }
 
-func NewDatabaseStorage(dsn string) (*DatabaseStorage, error) {
+func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	storage := &DatabaseStorage{db: db}
-	if err := storage.createTable(); err != nil {
+	if err := storage.createTable(ctx); err != nil {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
 	return storage, nil
 }
 
-func (s *DatabaseStorage) createTable() error {
+func (s *DatabaseStorage) createTable(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS urls (
 		id SERIAL PRIMARY KEY,
@@ -48,7 +48,7 @@ func (s *DatabaseStorage) createTable() error {
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	)`
 
-	_, err := s.db.Exec(query)
+	_, err := s.db.ExecContext(ctx, query)
 	return err
 }
 
@@ -56,18 +56,14 @@ func (s *DatabaseStorage) Close() error {
 	return s.db.Close()
 }
 
-func (s *DatabaseStorage) Ping() error {
-	return s.db.Ping()
-}
-
-func (s *DatabaseStorage) SaveURL(shortID, longURL string) error {
-	_, err := s.db.Exec("INSERT INTO urls (short_id, original_url) VALUES ($1, $2)", shortID, longURL)
+func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
+	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url) VALUES ($1, $2)", shortID, longURL)
 	return err
 }
 
-func (s *DatabaseStorage) GetURL(shortID string) (string, bool) {
+func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
 	var longURL string
-	err := s.db.QueryRow("SELECT original_url FROM urls WHERE short_id = $1", shortID).Scan(&longURL)
+	err := s.db.QueryRowContext(ctx, "SELECT original_url FROM urls WHERE short_id = $1", shortID).Scan(&longURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", false
@@ -77,21 +73,25 @@ func (s *DatabaseStorage) GetURL(shortID string) (string, bool) {
 	return longURL, true
 }
 
-func (s *DatabaseStorage) SaveURLBatch(urls map[string]string) error {
-	tx, err := s.db.Begin()
+func (s *DatabaseStorage) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
+func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Prepare("INSERT INTO urls (short_id, original_url) VALUES ($1, $2)")
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO urls (short_id, original_url) VALUES ($1, $2)")
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer stmt.Close()
 
 	for shortID, longURL := range urls {
-		_, err = stmt.Exec(shortID, longURL)
+		_, err = stmt.ExecContext(ctx, shortID, longURL)
 		if err != nil {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}

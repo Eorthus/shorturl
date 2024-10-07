@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +17,9 @@ import (
 )
 
 func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
-	store := storage.NewMemoryStorage()
+	ctx := context.Background()
+	store, err := storage.NewMemoryStorage(ctx)
+	require.NoError(t, err)
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
@@ -70,10 +73,10 @@ func TestHandlePost(t *testing.T) {
 func TestHandleGet(t *testing.T) {
 	r, store := setupRouter(t)
 
-	// Подготовка тестовых данных
+	ctx := context.Background()
 	shortID := "testid"
 	longURL := "https://example.com"
-	err := store.SaveURL(shortID, longURL)
+	err := store.SaveURL(ctx, shortID, longURL)
 	require.NoError(t, err)
 
 	tests := []struct {

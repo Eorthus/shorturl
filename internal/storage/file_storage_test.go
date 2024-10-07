@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,62 +12,51 @@ import (
 )
 
 func TestFileStorage(t *testing.T) {
-	// Создаем временную директорию для тестов
 	tempDir, err := os.MkdirTemp("", "file_storage_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	// Создаем путь к временному файлу
 	tempFile := filepath.Join(tempDir, "test_storage.json")
+	ctx := context.Background()
 
-	// Создаем инстанс FileStorage
-	store, err := NewFileStorage(tempFile)
+	store, err := NewFileStorage(ctx, tempFile)
 	require.NoError(t, err)
 
 	t.Run("SaveURL и GetURL", func(t *testing.T) {
-		// Тестовые данные
 		shortID := "abc123"
 		longURL := "https://example.com"
 
-		// Сохраняем URL
-		err := store.SaveURL(shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL)
 		assert.NoError(t, err)
 
-		// Проверяем, что URL был сохранен и доступен через GetURL
-		resultURL, exists := store.GetURL(shortID)
+		resultURL, exists := store.GetURL(ctx, shortID)
 		assert.True(t, exists, "URL должен существовать")
 		assert.Equal(t, longURL, resultURL, "Полученный URL должен соответствовать сохраненному")
 
-		// Проверяем несуществующий shortID
 		nonExistentShortID := "nonexistent"
-		resultURL, exists = store.GetURL(nonExistentShortID)
+		resultURL, exists = store.GetURL(ctx, nonExistentShortID)
 		assert.False(t, exists, "URL не должен существовать")
 		assert.Equal(t, "", resultURL, "Для несуществующего shortID результат должен быть пустым")
 	})
 
 	t.Run("Персистентность данных", func(t *testing.T) {
-		// Сохраняем URL
 		shortID := "def456"
 		longURL := "https://persistence-test.com"
-		err := store.SaveURL(shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL)
 		assert.NoError(t, err)
 
-		// Создаем новый инстанс FileStorage с тем же файлом
-		newStore, err := NewFileStorage(tempFile)
+		newStore, err := NewFileStorage(ctx, tempFile)
 		require.NoError(t, err)
 
-		// Проверяем, что данные были сохранены и загружены
-		resultURL, exists := newStore.GetURL(shortID)
+		resultURL, exists := newStore.GetURL(ctx, shortID)
 		assert.True(t, exists, "URL должен существовать после перезагрузки")
 		assert.Equal(t, longURL, resultURL, "Загруженный URL должен соответствовать сохраненному")
 	})
 
 	t.Run("Формат файла", func(t *testing.T) {
-		// Читаем содержимое файла
 		content, err := os.ReadFile(tempFile)
 		require.NoError(t, err)
 
-		// Проверяем, что каждая строка является валидным JSON
 		lines := splitLines(content)
 		for _, line := range lines {
 			var urlData URLData
@@ -78,32 +68,19 @@ func TestFileStorage(t *testing.T) {
 	})
 
 	t.Run("Ping", func(t *testing.T) {
-		tempDir, err := os.MkdirTemp("", "file_storage_ping_test")
-		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
-
-		tempFile := filepath.Join(tempDir, "test_storage.json")
-		store, err := NewFileStorage(tempFile)
+		// Тест для существующего файла
+		err := store.SaveURL(ctx, "test", "https://example.com") // Сохраняем URL, чтобы создать файл
 		require.NoError(t, err)
 
-		// Файл еще не создан, Ping должен вернуть ошибку
-		err = store.Ping()
-		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
-
-		// Сохраняем URL, чтобы создать файл
-		err = store.SaveURL("test", "https://example.com")
-		require.NoError(t, err)
-
-		// Теперь файл должен существовать, и Ping должен быть успешным
-		err = store.Ping()
+		err = store.Ping(ctx)
 		assert.NoError(t, err, "Ping должен быть успешным для существующего файла")
 
-		// Проверка на другой несуществующий файл
+		// Тест для несуществующего файла
 		nonExistentFile := filepath.Join(tempDir, "non_existent.json")
-		storeFail, err := NewFileStorage(nonExistentFile)
-		require.NoError(t, err)
+		storeNonExistent, err := NewFileStorage(ctx, nonExistentFile)
+		require.NoError(t, err, "Создание FileStorage для несуществующего файла не должно вызывать ошибку")
 
-		err = storeFail.Ping()
+		err = storeNonExistent.Ping(ctx)
 		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
 	})
 }

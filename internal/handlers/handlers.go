@@ -52,7 +52,7 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortID := utils.GenerateShortID()
-	err = h.Store.SaveURL(shortID, longURL)
+	err = h.Store.SaveURL(r.Context(), shortID, longURL)
 	if err != nil {
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
@@ -68,7 +68,8 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "shortID")
 
-	if longURL, exists := h.Store.GetURL(shortID); exists {
+	longURL, exists := h.Store.GetURL(r.Context(), shortID)
+	if exists {
 		http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
 	} else {
 		http.Error(w, "Short URL not found", http.StatusNotFound)
@@ -91,7 +92,7 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortID := utils.GenerateShortID()
-	err := h.Store.SaveURL(shortID, request.URL)
+	err := h.Store.SaveURL(r.Context(), shortID, request.URL)
 	if err != nil {
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
@@ -107,7 +108,7 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
-	if err := h.Store.Ping(); err != nil {
+	if err := h.Store.Ping(r.Context()); err != nil {
 		http.Error(w, "Storage connection failed", http.StatusInternalServerError)
 		return
 	}
@@ -145,7 +146,7 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	err := h.Store.SaveURLBatch(urlMap)
+	err := h.Store.SaveURLBatch(r.Context(), urlMap)
 	if err != nil {
 		http.Error(w, "Error saving URLs", http.StatusInternalServerError)
 		return

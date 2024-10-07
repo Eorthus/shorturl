@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -15,6 +16,7 @@ func TestDatabaseStorage(t *testing.T) {
 	defer db.Close()
 
 	store := &DatabaseStorage{db: db}
+	ctx := context.Background()
 
 	t.Run("SaveURL", func(t *testing.T) {
 		shortID := "abc123"
@@ -24,7 +26,7 @@ func TestDatabaseStorage(t *testing.T) {
 			WithArgs(shortID, longURL).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		err := store.SaveURL(shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL)
 		assert.NoError(t, err)
 	})
 
@@ -37,7 +39,7 @@ func TestDatabaseStorage(t *testing.T) {
 			WithArgs(shortID).
 			WillReturnRows(rows)
 
-		resultURL, exists := store.GetURL(shortID)
+		resultURL, exists := store.GetURL(ctx, shortID)
 		assert.True(t, exists)
 		assert.Equal(t, longURL, resultURL)
 	})
@@ -49,7 +51,7 @@ func TestDatabaseStorage(t *testing.T) {
 			WithArgs(shortID).
 			WillReturnError(sql.ErrNoRows)
 
-		resultURL, exists := store.GetURL(shortID)
+		resultURL, exists := store.GetURL(ctx, shortID)
 		assert.False(t, exists)
 		assert.Empty(t, resultURL)
 	})
@@ -57,7 +59,7 @@ func TestDatabaseStorage(t *testing.T) {
 	t.Run("Ping", func(t *testing.T) {
 		mock.ExpectPing()
 
-		err := store.Ping()
+		err := store.Ping(ctx)
 		assert.NoError(t, err)
 	})
 
@@ -82,7 +84,7 @@ func TestDatabaseStorage(t *testing.T) {
 		}
 		mock.ExpectCommit()
 
-		err = store.SaveURLBatch(urls)
+		err = store.SaveURLBatch(ctx, urls)
 		assert.NoError(t, err)
 
 		err = mock.ExpectationsWereMet()
