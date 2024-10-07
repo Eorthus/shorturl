@@ -10,6 +10,7 @@ type Storage interface {
 	GetURL(ctx context.Context, shortID string) (string, bool)
 	Ping(ctx context.Context) error
 	SaveURLBatch(ctx context.Context, urls map[string]string) error
+	GetShortIDByLongURL(ctx context.Context, longURL string) (string, error)
 }
 
 // URLData represents the structure for storing URL data

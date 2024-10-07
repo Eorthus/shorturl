@@ -51,9 +51,26 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID := utils.GenerateShortID()
+	shortID, err := h.Store.GetShortIDByLongURL(r.Context(), longURL)
+	if err != nil {
+		http.Error(w, "Error checking URL", http.StatusInternalServerError)
+		return
+	}
+
+	if shortID != "" {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(h.BaseURL + "/" + shortID))
+		return
+	}
+
+	shortID = utils.GenerateShortID()
 	err = h.Store.SaveURL(r.Context(), shortID, longURL)
 	if err != nil {
+		if err == storage.ErrURLExists {
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(h.BaseURL + "/" + shortID))
+			return
+		}
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
@@ -91,16 +108,37 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID := utils.GenerateShortID()
-	err := h.Store.SaveURL(r.Context(), shortID, request.URL)
+	shortID, err := h.Store.GetShortIDByLongURL(r.Context(), request.URL)
 	if err != nil {
+		http.Error(w, "Error checking URL", http.StatusInternalServerError)
+		return
+	}
+
+	var response ShortenResponse
+
+	if shortID != "" {
+		response.Result = h.BaseURL + "/" + shortID
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	shortID = utils.GenerateShortID()
+	err = h.Store.SaveURL(r.Context(), shortID, request.URL)
+	if err != nil {
+		if err == storage.ErrURLExists {
+			response.Result = h.BaseURL + "/" + shortID
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
 
-	shortURL := h.BaseURL + "/" + shortID
-
-	response := ShortenResponse{Result: shortURL}
+	response.Result = h.BaseURL + "/" + shortID
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

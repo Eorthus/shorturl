@@ -90,4 +90,30 @@ func TestDatabaseStorage(t *testing.T) {
 		err = mock.ExpectationsWereMet()
 		assert.NoError(t, err)
 	})
+
+	t.Run("GetShortIDByLongURL - Existing", func(t *testing.T) {
+		longURL := "https://example.com"
+		expectedShortID := "abc123"
+
+		rows := sqlmock.NewRows([]string{"short_id"}).AddRow(expectedShortID)
+		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = ?").
+			WithArgs(longURL).
+			WillReturnRows(rows)
+
+		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedShortID, shortID)
+	})
+
+	t.Run("GetShortIDByLongURL - Non-existing", func(t *testing.T) {
+		longURL := "https://nonexistent.com"
+
+		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = ?").
+			WithArgs(longURL).
+			WillReturnError(sql.ErrNoRows)
+
+		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
+		assert.NoError(t, err)
+		assert.Empty(t, shortID)
+	})
 }

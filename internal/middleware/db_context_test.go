@@ -35,6 +35,11 @@ func (m *MockStorage) SaveURLBatch(ctx context.Context, urls map[string]string) 
 	return args.Error(0)
 }
 
+func (m *MockStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
+	args := m.Called(ctx, longURL)
+	return args.String(0), args.Error(1)
+}
+
 func TestDBContextMiddleware(t *testing.T) {
 	mockStore := new(MockStorage)
 	middleware := DBContextMiddleware(mockStore)

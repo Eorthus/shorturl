@@ -129,3 +129,15 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 		return nil
 	}
 }
+
+func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	for shortID, urlData := range fs.data {
+		if urlData.OriginalURL == longURL {
+			return shortID, nil
+		}
+	}
+	return "", nil
+}

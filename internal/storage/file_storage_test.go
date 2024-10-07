@@ -83,6 +83,22 @@ func TestFileStorage(t *testing.T) {
 		err = storeNonExistent.Ping(ctx)
 		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
 	})
+
+	t.Run("GetShortIDByLongURL", func(t *testing.T) {
+		shortID := "def456"
+		longURL := "https://example.org"
+		err := store.SaveURL(ctx, shortID, longURL)
+		assert.NoError(t, err)
+
+		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL)
+		assert.NoError(t, err)
+		assert.Equal(t, shortID, resultShortID)
+
+		nonExistentURL := "https://nonexistent.com"
+		resultShortID, err = store.GetShortIDByLongURL(ctx, nonExistentURL)
+		assert.NoError(t, err)
+		assert.Empty(t, resultShortID)
+	})
 }
 
 // splitLines разделяет байтовый срез на строки

@@ -74,4 +74,21 @@ func TestMemoryStorage(t *testing.T) {
 			<-done
 		}
 	})
+
+	t.Run("GetShortIDByLongURL", func(t *testing.T) {
+		shortID := "test123"
+		longURL := "https://testexample.com"
+
+		err := store.SaveURL(ctx, shortID, longURL)
+		assert.NoError(t, err)
+
+		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL)
+		assert.NoError(t, err)
+		assert.Equal(t, shortID, resultShortID)
+
+		nonExistentURL := "https://nonexistent.com"
+		resultShortID, err = store.GetShortIDByLongURL(ctx, nonExistentURL)
+		assert.NoError(t, err)
+		assert.Empty(t, resultShortID)
+	})
 }

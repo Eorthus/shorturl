@@ -3,23 +3,19 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
-type DBInterface interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-	PingContext(ctx context.Context) error
-	Close() error
-	Begin() (*sql.Tx, error)
-	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+type DatabaseStorage struct {
+	db *sql.DB
 }
 
-type DatabaseStorage struct {
-	db DBInterface
-}
+var ErrURLExists = errors.New("URL already exists")
 
 func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, error) {
 	db, err := sql.Open("postgres", dsn)
@@ -46,7 +42,9 @@ func (s *DatabaseStorage) createTable(ctx context.Context) error {
 		short_id VARCHAR(10) UNIQUE NOT NULL,
 		original_url TEXT NOT NULL,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-	)`
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
+	`
 
 	_, err := s.db.ExecContext(ctx, query)
 	return err
@@ -58,7 +56,16 @@ func (s *DatabaseStorage) Close() error {
 
 func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
 	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url) VALUES ($1, $2)", shortID, longURL)
-	return err
+	if err != nil {
+		pqErr, ok := err.(*pq.Error)
+		if ok && pqErr.Code == pgerrcode.UniqueViolation {
+			if pqErr.Constraint == "idx_original_url" {
+				return ErrURLExists
+			}
+		}
+		return fmt.Errorf("failed to save URL: %w", err)
+	}
+	return nil
 }
 
 func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
@@ -98,4 +105,16 @@ func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]stri
 	}
 
 	return tx.Commit()
+}
+
+func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
+	var shortID string
+	err := s.db.QueryRowContext(ctx, "SELECT short_id FROM urls WHERE original_url = $1", longURL).Scan(&shortID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get short ID: %w", err)
+	}
+	return shortID, nil
 }

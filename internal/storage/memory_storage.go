@@ -53,3 +53,15 @@ func (ms *MemoryStorage) SaveURLBatch(ctx context.Context, urls map[string]strin
 
 	return nil
 }
+
+func (ms *MemoryStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	for shortID, url := range ms.data {
+		if url == longURL {
+			return shortID, nil
+		}
+	}
+	return "", nil
+}

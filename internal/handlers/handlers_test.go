@@ -39,7 +39,7 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
 }
 
 func TestHandlePost(t *testing.T) {
-	r, _ := setupRouter(t)
+	r, store := setupRouter(t)
 
 	tests := []struct {
 		name           string
@@ -50,7 +50,13 @@ func TestHandlePost(t *testing.T) {
 		{"Valid URL", "https://example.com", http.StatusCreated, "http://localhost:8080/"},
 		{"Invalid URL", "example.com", http.StatusBadRequest, ""},
 		{"Empty URL", "", http.StatusBadRequest, ""},
+		{"Duplicate URL", "https://duplicate.com", http.StatusConflict, "http://localhost:8080/"},
 	}
+
+	// Предварительно сохраним URL для теста дубликата
+	ctx := context.Background()
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -62,7 +68,7 @@ func TestHandlePost(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
-			if tt.expectedStatus == http.StatusCreated {
+			if tt.expectedStatus == http.StatusCreated || tt.expectedStatus == http.StatusConflict {
 				assert.True(t, strings.HasPrefix(rr.Body.String(), tt.expectedPrefix),
 					"handler returned unexpected body: got %v want prefix %v", rr.Body.String(), tt.expectedPrefix)
 			}
@@ -108,23 +114,21 @@ func TestHandleGet(t *testing.T) {
 }
 
 func TestHandleJSONPost(t *testing.T) {
-	r, _ := setupRouter(t)
+	r, store := setupRouter(t)
 
 	tests := []struct {
 		name           string
 		requestBody    string
 		expectedStatus int
-		expectedPrefix string
 	}{
 		{
 			name:           "Valid URL",
-			requestBody:    `{"url": "https://practicum.yandex.ru"}`,
+			requestBody:    `{"url": "https://example.com"}`,
 			expectedStatus: http.StatusCreated,
-			expectedPrefix: `{"result":"http://localhost:8080/`,
 		},
 		{
 			name:           "Invalid JSON",
-			requestBody:    `{"url": "https://practicum.yandex.ru"`,
+			requestBody:    `{"url": "https://example.com"`,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -132,7 +136,17 @@ func TestHandleJSONPost(t *testing.T) {
 			requestBody:    `{"url": "not-a-url"}`,
 			expectedStatus: http.StatusBadRequest,
 		},
+		{
+			name:           "Duplicate URL",
+			requestBody:    `{"url": "https://duplicate.com"}`,
+			expectedStatus: http.StatusConflict,
+		},
 	}
+
+	// Предварительно сохраним URL для теста дубликата
+	ctx := context.Background()
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,15 +160,13 @@ func TestHandleJSONPost(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
-			if tt.expectedStatus == http.StatusCreated {
-				var response map[string]string
+			if tt.expectedStatus == http.StatusCreated || tt.expectedStatus == http.StatusConflict {
+				var response ShortenResponse
 				err := json.Unmarshal(rr.Body.Bytes(), &response)
 				require.NoError(t, err, "Failed to unmarshal response")
 
-				result, ok := response["result"]
-				assert.True(t, ok, "Response doesn't contain 'result' key")
-				assert.True(t, strings.HasPrefix(result, "http://localhost:8080/"),
-					"handler returned unexpected body: got %v want prefix %v", result, "http://localhost:8080/")
+				assert.True(t, strings.HasPrefix(response.Result, "http://localhost:8080/"),
+					"handler returned unexpected body: got %v", response.Result)
 			}
 		})
 	}
