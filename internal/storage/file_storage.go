@@ -20,12 +20,15 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	}
 
 	// Проверяем существование файла, но не создаем его
-	if _, err := os.Stat(filePath); err == nil {
-		if err := fs.loadFromFile(ctx); err != nil {
-			return nil, err
-		}
-	} else if !os.IsNotExist(err) {
+	_, err := os.Stat(filePath)
+	if err != nil && !os.IsNotExist(err) {
+		// Возвращаем ошибку, если она не связана с отсутствием файла
 		return nil, err
+	}
+
+	// Если файл существует, загружаем данные из файла
+	if err == nil && fs.loadFromFile(ctx) != nil {
+		return nil, fs.loadFromFile(ctx)
 	}
 
 	return fs, nil

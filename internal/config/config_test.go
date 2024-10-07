@@ -42,6 +42,7 @@ func TestParseConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Сохраняем исходные значения переменных окружения
 			originalEnv := make(map[string]string)
 			for key := range tt.envVars {
@@ -174,6 +175,7 @@ func TestApplyPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Сохраняем исходные значения переменных окружения
 			originalEnv := make(map[string]string)
 			for key := range tt.envVars {

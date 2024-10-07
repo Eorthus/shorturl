@@ -51,6 +51,7 @@ func TestGETLogger(t *testing.T) {
 	handler := GETLogger(logger)(testHandler)
 
 	t.Run("GET request", func(t *testing.T) {
+		t.Parallel()
 		// Очищаем логи перед каждым тестом
 		recorded.TakeAll()
 
@@ -86,6 +87,7 @@ func TestPOSTLogger(t *testing.T) {
 	handler := POSTLogger(logger)(testHandler)
 
 	t.Run("POST request", func(t *testing.T) {
+		t.Parallel()
 		// Очищаем логи перед каждым тестом
 		recorded.TakeAll()
 
@@ -121,6 +123,7 @@ func TestLogger(t *testing.T) {
 	handler := Logger(logger)(testHandler)
 
 	t.Run("GET request", func(t *testing.T) {
+		t.Parallel()
 		// Очищаем логи перед каждым тестом
 		recorded.TakeAll()
 
@@ -144,6 +147,7 @@ func TestLogger(t *testing.T) {
 	})
 
 	t.Run("POST request", func(t *testing.T) {
+		t.Parallel()
 		// Очищаем логи перед каждым тестом
 		recorded.TakeAll()
 
