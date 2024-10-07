@@ -37,7 +37,7 @@ func TestApiContextMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			middleware := ApiContextMiddleware(tt.middlewareTimeout)
+			middleware := APIContextMiddleware(tt.middlewareTimeout)
 			wrappedHandler := middleware(handler)
 
 			req := httptest.NewRequest("GET", "http://example.com", nil)

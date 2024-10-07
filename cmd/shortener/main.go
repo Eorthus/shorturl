@@ -63,7 +63,7 @@ func main() {
 
 	r.Use(logger.Logger(zapLogger))
 	r.Use(middleware.GzipMiddleware)
-	r.Use(middleware.ApiContextMiddleware(10 * time.Second))
+	r.Use(middleware.APIContextMiddleware(10 * time.Second))
 	r.Use(middleware.DBContextMiddleware(store))
 
 	r.Group(func(r chi.Router) {

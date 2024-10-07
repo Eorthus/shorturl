@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Eorthus/shorturl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -41,7 +40,8 @@ func TestDBContextMiddleware(t *testing.T) {
 	middleware := DBContextMiddleware(mockStore)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store, ok := r.Context().Value("db").(storage.Storage)
+		// Используем функцию GetDBFromContext для извлечения значения из контекста
+		store, ok := GetDBFromContext(r.Context())
 		assert.True(t, ok, "Context should contain db value of type storage.Storage")
 		assert.Equal(t, mockStore, store, "Context should contain the correct storage instance")
 		w.WriteHeader(http.StatusOK)
