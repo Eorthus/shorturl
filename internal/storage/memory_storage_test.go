@@ -91,4 +91,28 @@ func TestMemoryStorage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, resultShortID)
 	})
+
+	t.Run("Duplicate SaveURL", func(t *testing.T) {
+		shortID := "duplicate"
+		longURL1 := "https://example1.com"
+		longURL2 := "https://example2.com"
+
+		err := store.SaveURL(ctx, shortID, longURL1)
+		assert.NoError(t, err)
+
+		err = store.SaveURL(ctx, shortID, longURL2)
+		assert.NoError(t, err)
+
+		resultURL, exists := store.GetURL(ctx, shortID)
+		assert.True(t, exists)
+		assert.Equal(t, longURL2, resultURL)
+
+		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL2)
+		assert.NoError(t, err)
+		assert.Equal(t, shortID, resultShortID)
+
+		resultShortID, err = store.GetShortIDByLongURL(ctx, longURL1)
+		assert.NoError(t, err)
+		assert.Empty(t, resultShortID)
+	})
 }

@@ -31,33 +31,13 @@ func main() {
 	flag.Parse()              // Парсим флаги командной строки после их определения
 	config.ApplyPriority(cfg) // Применяем приоритет параметров
 
-	// Инициализация хранилища
-	var store storage.Storage
 	ctx := context.Background()
-
-	if cfg.DatabaseDSN != "" {
-		dbStorage, err := storage.NewDatabaseStorage(ctx, cfg.DatabaseDSN)
-		if err != nil {
-			zapLogger.Fatal("Failed to initialize database storage", zap.Error(err))
-		}
-		defer dbStorage.Close()
-		store = dbStorage
-	} else if cfg.FileStoragePath != "" {
-		fileStorage, err := storage.NewFileStorage(ctx, cfg.FileStoragePath)
-		if err != nil {
-			zapLogger.Fatal("Failed to initialize file storage", zap.Error(err))
-		}
-		store = fileStorage
-	} else {
-		zapLogger.Info("Using in-memory storage")
-		memStorage, err := storage.NewMemoryStorage(ctx)
-		if err != nil {
-			zapLogger.Fatal("Failed to initialize memory storage", zap.Error(err))
-		}
-		store = memStorage
+	store, err := storage.InitStorage(ctx, cfg)
+	if err != nil {
+		zapLogger.Fatal("Failed to initialize storage", zap.Error(err))
 	}
 
-	handler := handlers.NewHandler(cfg.BaseURL, store)
+	handler := handlers.NewHandler(cfg.BaseURL, store, zapLogger)
 
 	r := chi.NewRouter()
 

@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+
+	"github.com/Eorthus/shorturl/internal/config"
 )
 
 // Storage defines the interface for URL storage operations
@@ -17,4 +19,14 @@ type Storage interface {
 type URLData struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+func InitStorage(ctx context.Context, cfg *config.Config) (Storage, error) {
+	if cfg.DatabaseDSN != "" {
+		return NewDatabaseStorage(ctx, cfg.DatabaseDSN)
+	} else if cfg.FileStoragePath != "" {
+		return NewFileStorage(ctx, cfg.FileStoragePath)
+	} else {
+		return NewMemoryStorage(ctx)
+	}
 }
