@@ -39,6 +39,7 @@ func (s *DatabaseStorage) createTable(ctx context.Context) error {
 	CREATE TABLE IF NOT EXISTS urls (
 		id SERIAL PRIMARY KEY,
 		short_id VARCHAR(10) UNIQUE NOT NULL,
+		user_id TEXT,
 		original_url TEXT NOT NULL,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	);
@@ -56,13 +57,12 @@ func (s *DatabaseStorage) Close() error {
 func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, userID string) error {
 	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)", shortID, longURL, userID)
 	if err != nil {
-		return fmt.Errorf("failed to execute statement: %w", err)
-	}
-	if err != nil {
 		pqErr, ok := err.(*pq.Error)
 		if ok && pqErr.Code == pgerrcode.UniqueViolation {
-			if pqErr.Constraint == "idx_original_url" {
-				return ErrURLExists
+			// Если URL уже существует, вернем существующий shortID
+			existingShortID, err := s.GetShortIDByLongURL(ctx, longURL)
+			if err == nil && existingShortID != "" {
+				return nil // URL уже существует, но это не ошибка
 			}
 		}
 		return fmt.Errorf("failed to save URL: %w", err)
