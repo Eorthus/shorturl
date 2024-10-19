@@ -81,19 +81,19 @@ func (h *Handler) HandleUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	respPairs := make([]respPair, 0, len(urls))
 	for _, url := range urls {
 		respPairs = append(respPairs, respPair{
 			ShortURL:    h.BaseURL + "/" + url.ShortURL,
 			OriginalURL: url.OriginalURL,
 		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if len(respPairs) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
 	}
 
 	w.WriteHeader(http.StatusOK)
