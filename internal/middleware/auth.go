@@ -19,12 +19,11 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		userID := GetUserID(r)
 		if userID == "" {
 			userID = uuid.New().String()
-			setUserIDCookie(w, userID)
+			SetUserIDCookie(w, userID)
 		}
 		next.ServeHTTP(w, r)
 	})
 }
-
 func GetUserID(r *http.Request) string {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {
@@ -41,7 +40,7 @@ func GetUserID(r *http.Request) string {
 	return userID
 }
 
-func setUserIDCookie(w http.ResponseWriter, userID string) {
+func SetUserIDCookie(w http.ResponseWriter, userID string) {
 	signature := generateSignature(userID)
 	value := userID + ":" + signature
 	http.SetCookie(w, &http.Cookie{

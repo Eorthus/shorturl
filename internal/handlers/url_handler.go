@@ -10,10 +10,15 @@ import (
 	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/Eorthus/shorturl/internal/utils"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
+	if userID == "" {
+		userID = uuid.New().String()
+		middleware.SetUserIDCookie(w, userID)
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
@@ -68,7 +73,13 @@ func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
+
 	userID := middleware.GetUserID(r)
+	if userID == "" {
+		userID = uuid.New().String()
+		middleware.SetUserIDCookie(w, userID)
+	}
+
 	var request struct {
 		URL string `json:"url"`
 	}
