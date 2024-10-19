@@ -12,15 +12,12 @@ import (
 func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	var requests []BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	if len(requests) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest) // Изменено на StatusBadRequest
-		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+		http.Error(w, "Empty batch", http.StatusBadRequest)
 		return
 	}
 
@@ -29,28 +26,14 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 
 	for _, req := range requests {
 		if !strings.HasPrefix(req.OriginalURL, "http://") && !strings.HasPrefix(req.OriginalURL, "https://") {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest) // Изменено на StatusBadRequest
-			apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+			http.Error(w, "Invalid URL format", http.StatusBadRequest)
 			return
 		}
 
-		// Проверяем существование URL
-		shortID, exists, err := utils.CheckURLExists(r.Context(), h.Store, req.OriginalURL)
-		if err != nil && err != apperrors.ErrNoSuchURL {
-			// Возвращаем ошибку только в случае реальной ошибки, а не если URL не найден
-			w.Header().Set("Content-Type", "application/json")
-			apperrors.HandleHTTPError(w, err, h.Logger)
-			return
-		}
+		// Создаем новый shortID для каждого URL
+		shortID := utils.GenerateShortID()
+		urlMap[shortID] = req.OriginalURL
 
-		// Если URL не существует, создаем новый shortID
-		if exists != http.StatusOK {
-			shortID = utils.GenerateShortID()
-			urlMap[shortID] = req.OriginalURL
-		}
-
-		// Формируем короткий URL
 		shortURL := h.BaseURL + "/" + shortID
 		responses = append(responses, BatchResponse{
 			CorrelationID: req.CorrelationID,
@@ -58,7 +41,11 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	userID, _ := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		userID = "public" // Если userID нет, используем "public"
+	}
+
 	if len(urlMap) > 0 {
 		err := h.Store.SaveURLBatch(r.Context(), urlMap, userID)
 		if err != nil {
@@ -68,9 +55,8 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Формируем правильный ответ
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated) // Изменено на StatusCreated
+	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 	}
