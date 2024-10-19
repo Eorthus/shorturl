@@ -25,20 +25,26 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID, _, err := utils.CheckURLExists(r.Context(), h.Store, longURL)
-	if err != nil {
+	userID, _ := r.Context().Value("userID").(string)
+
+	// Проверяем, существует ли уже такой URL
+	existingShortID, err := h.Store.GetShortIDByLongURL(r.Context(), longURL)
+	if err != nil && err != apperrors.ErrNoSuchURL {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
-	if shortID != "" {
+	if existingShortID != "" {
+		// URL уже существует, возвращаем его с кодом 409 Conflict
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(h.BaseURL + "/" + shortID))
+		w.Write([]byte(h.BaseURL + "/" + existingShortID))
 		return
 	}
 
-	shortID = utils.GenerateShortID()
-	err = h.Store.SaveURL(r.Context(), shortID, longURL)
+	// Если URL не существует, создаем новый
+	shortID := utils.GenerateShortID()
+
+	err = h.Store.SaveURL(r.Context(), shortID, longURL, userID)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
@@ -84,30 +90,34 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID, _, err := utils.CheckURLExists(r.Context(), h.Store, request.URL)
-	if err != nil {
+	userID, _ := r.Context().Value("userID").(string)
+
+	// Проверяем, существует ли уже такой URL
+	existingShortID, err := h.Store.GetShortIDByLongURL(r.Context(), request.URL)
+	if err != nil && err != apperrors.ErrNoSuchURL {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
-	var response ShortenResponse
-
-	if shortID != "" {
-		response.Result = h.BaseURL + "/" + shortID
-		w.Header().Set("Content-Type", "application/json")
+	if existingShortID != "" {
+		// URL уже существует, возвращаем его с кодом 409 Conflict
 		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(response)
+		json.NewEncoder(w).Encode(map[string]string{"result": h.BaseURL + "/" + existingShortID})
 		return
 	}
 
-	shortID = utils.GenerateShortID()
-	err = h.Store.SaveURL(r.Context(), shortID, request.URL)
+	// Если URL не существует, создаем новый
+	shortID := utils.GenerateShortID()
+
+	err = h.Store.SaveURL(r.Context(), shortID, request.URL, userID)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
-	response.Result = h.BaseURL + "/" + shortID
+	response := ShortenResponse{
+		Result: h.BaseURL + "/" + shortID,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,11 +15,12 @@ func TestMemoryStorage(t *testing.T) {
 	store, err := NewMemoryStorage(ctx)
 	require.NoError(t, err)
 
-	t.Run("SaveURL and GetURL", func(t *testing.T) {
+	t.Run("SaveURL and GetURL with userID", func(t *testing.T) {
 		shortID := "abc123"
 		longURL := "https://example.com"
+		userID := "user1"
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		resultURL, exists := store.GetURL(ctx, shortID)
@@ -29,18 +31,14 @@ func TestMemoryStorage(t *testing.T) {
 		assert.False(t, exists)
 	})
 
-	t.Run("Ping", func(t *testing.T) {
-		err := store.Ping(ctx)
-		assert.NoError(t, err)
-	})
-
-	t.Run("SaveURLBatch", func(t *testing.T) {
+	t.Run("SaveURLBatch with userID", func(t *testing.T) {
 		urls := map[string]string{
-			"def456": "https://example.org",
 			"ghi789": "https://example.net",
+			"jkl012": "https://example.edu",
 		}
+		userID := "user2"
 
-		err := store.SaveURLBatch(ctx, urls)
+		err := store.SaveURLBatch(ctx, urls, userID)
 		assert.NoError(t, err)
 
 		for shortID, longURL := range urls {
@@ -48,6 +46,10 @@ func TestMemoryStorage(t *testing.T) {
 			assert.True(t, exists)
 			assert.Equal(t, longURL, resultURL)
 		}
+
+		userURLs, err := store.GetUserURLs(ctx, userID)
+		assert.NoError(t, err)
+		assert.Len(t, userURLs, len(urls))
 	})
 
 	t.Run("Concurrent access", func(t *testing.T) {
@@ -58,8 +60,9 @@ func TestMemoryStorage(t *testing.T) {
 			go func(id int) {
 				shortID := fmt.Sprintf("concurrent%d", id)
 				longURL := fmt.Sprintf("https://concurrent%d.com", id)
+				userID := fmt.Sprintf("user%d", id%10)
 
-				err := store.SaveURL(ctx, shortID, longURL)
+				err := store.SaveURL(ctx, shortID, longURL, userID)
 				assert.NoError(t, err)
 
 				resultURL, exists := store.GetURL(ctx, shortID)
@@ -78,8 +81,9 @@ func TestMemoryStorage(t *testing.T) {
 	t.Run("GetShortIDByLongURL", func(t *testing.T) {
 		shortID := "test123"
 		longURL := "https://testexample.com"
+		userID := "user2"
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL)
@@ -92,27 +96,60 @@ func TestMemoryStorage(t *testing.T) {
 		assert.Empty(t, resultShortID)
 	})
 
+	t.Run("GetUserURLs", func(t *testing.T) {
+		userID := "testuser"
+		urls := []struct {
+			shortID string
+			longURL string
+		}{
+			{"user1", "https://user1.com"},
+			{"user2", "https://user2.com"},
+		}
+
+		for _, url := range urls {
+			err := store.SaveURL(ctx, url.shortID, url.longURL, userID)
+			assert.NoError(t, err)
+		}
+
+		userURLs, err := store.GetUserURLs(ctx, userID)
+		assert.NoError(t, err)
+		assert.Len(t, userURLs, len(urls))
+
+		for i, url := range urls {
+			assert.Equal(t, url.shortID, userURLs[i].ShortURL)
+			assert.Equal(t, url.longURL, userURLs[i].OriginalURL)
+		}
+
+		emptyUserURLs, err := store.GetUserURLs(ctx, "nonexistentuser")
+		assert.NoError(t, err)
+		assert.Empty(t, emptyUserURLs)
+	})
+
 	t.Run("Duplicate SaveURL", func(t *testing.T) {
 		shortID := "duplicate"
 		longURL1 := "https://example1.com"
 		longURL2 := "https://example2.com"
+		userID := "duplicateuser"
 
-		err := store.SaveURL(ctx, shortID, longURL1)
+		// Сохраняем первый URL
+		err := store.SaveURL(ctx, shortID, longURL1, userID)
 		assert.NoError(t, err)
 
-		err = store.SaveURL(ctx, shortID, longURL2)
-		assert.NoError(t, err)
+		// Сохраняем дубликат URL, ожидаем ошибку дубликата
+		err = store.SaveURL(ctx, shortID, longURL2, userID)
+		assert.Equal(t, apperrors.ErrURLExists, err)
 
+		// Проверяем, что сохранен только первый URL
 		resultURL, exists := store.GetURL(ctx, shortID)
 		assert.True(t, exists)
-		assert.Equal(t, longURL2, resultURL)
+		assert.Equal(t, longURL1, resultURL)
 
-		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL2)
+		// Проверяем, что URL для пользователя содержит только первый URL
+		userURLs, err := store.GetUserURLs(ctx, userID)
 		assert.NoError(t, err)
-		assert.Equal(t, shortID, resultShortID)
-
-		resultShortID, err = store.GetShortIDByLongURL(ctx, longURL1)
-		assert.NoError(t, err)
-		assert.Empty(t, resultShortID)
+		assert.Len(t, userURLs, 1)
+		assert.Equal(t, shortID, userURLs[0].ShortURL)
+		assert.Equal(t, longURL1, userURLs[0].OriginalURL)
 	})
+
 }

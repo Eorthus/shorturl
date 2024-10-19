@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,9 +29,9 @@ func TestHandlePost(t *testing.T) {
 		{"Duplicate URL", "https://duplicate.com", http.StatusConflict, "http://localhost:8080/"},
 	}
 
-	// Предварительно сохраним URL для теста дубликата
+	// Предварительно сохраняем URL для теста дубликата
 	ctx := context.Background()
-	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com", "testuser")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -38,8 +39,15 @@ func TestHandlePost(t *testing.T) {
 			req, err := http.NewRequest("POST", "/", bytes.NewBufferString(tt.url))
 			require.NoError(t, err)
 
+			// Добавляем userID в контекст запроса
+			ctx := context.WithValue(req.Context(), "userID", "testuser")
+			req = req.WithContext(ctx)
+
 			rr := httptest.NewRecorder()
-			r.ServeHTTP(rr, req)
+
+			// Оборачиваем запрос в AuthMiddleware
+			handler := middleware.AuthMiddleware(r)
+			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
@@ -57,7 +65,7 @@ func TestHandleGet(t *testing.T) {
 	ctx := context.Background()
 	shortID := "testid"
 	longURL := "https://example.com"
-	err := store.SaveURL(ctx, shortID, longURL)
+	err := store.SaveURL(ctx, shortID, longURL, "testuser")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -123,9 +131,9 @@ func TestHandleJSONPost(t *testing.T) {
 		},
 	}
 
-	// Предварительно сохраним URL для теста дубликата
+	// Предварительно сохраняем URL для теста дубликата
 	ctx := context.Background()
-	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com", "testuser")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -133,10 +141,17 @@ func TestHandleJSONPost(t *testing.T) {
 			req, err := http.NewRequest("POST", "/api/shorten", bytes.NewBufferString(tt.requestBody))
 			require.NoError(t, err)
 
+			// Добавляем userID в контекст запроса
+			ctx := context.WithValue(req.Context(), "userID", "testuser")
+			req = req.WithContext(ctx)
+
 			req.Header.Set("Content-Type", "application/json")
 
 			rr := httptest.NewRecorder()
-			r.ServeHTTP(rr, req)
+
+			// Оборачиваем запрос в AuthMiddleware
+			handler := middleware.AuthMiddleware(r)
+			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 

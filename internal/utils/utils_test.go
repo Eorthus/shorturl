@@ -33,7 +33,7 @@ func TestCheckURLExists(t *testing.T) {
 	assert.Empty(t, shortID)
 
 	// Сохраняем URL
-	err = store.SaveURL(ctx, "abc123", "https://example.com")
+	err = store.SaveURL(ctx, "abc123", "https://example.com", "testuser")
 	require.NoError(t, err)
 
 	// Тест на существующий URL

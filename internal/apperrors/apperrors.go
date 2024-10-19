@@ -13,6 +13,7 @@ var (
 	ErrInvalidURLFormat  = errors.New("invalid URL format")
 	ErrInvalidJSONFormat = errors.New("invalid JSON format")
 	ErrEmptyURL          = errors.New("empty URL")
+	ErrUnauthorized      = errors.New("unauthorized")
 )
 
 func HandleHTTPError(w http.ResponseWriter, err error, logger *zap.Logger) {
@@ -37,6 +38,9 @@ func HandleHTTPError(w http.ResponseWriter, err error, logger *zap.Logger) {
 	case errors.Is(err, ErrEmptyURL):
 		status = http.StatusBadRequest
 		message = "Empty URL"
+	case errors.Is(err, ErrUnauthorized):
+		status = http.StatusUnauthorized
+		message = "Unauthorized"
 	default:
 		status = http.StatusInternalServerError
 		message = "Internal server error"

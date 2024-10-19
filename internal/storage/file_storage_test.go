@@ -22,11 +22,14 @@ func TestFileStorage(t *testing.T) {
 	store, err := NewFileStorage(ctx, tempFile)
 	require.NoError(t, err)
 
-	t.Run("SaveURL и GetURL", func(t *testing.T) {
+	t.Run("SaveURL и GetURL с userID", func(t *testing.T) {
+		store.Clear()
+
 		shortID := "abc123"
 		longURL := "https://example.com"
+		userID := "user1"
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		resultURL, exists := store.GetURL(ctx, shortID)
@@ -40,9 +43,12 @@ func TestFileStorage(t *testing.T) {
 	})
 
 	t.Run("Персистентность данных", func(t *testing.T) {
-		shortID := "def456"
+		store.Clear()
+
+		shortID := "ghi789"
 		longURL := "https://persistence-test.com"
-		err := store.SaveURL(ctx, shortID, longURL)
+		userID := "user2"
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		newStore, err := NewFileStorage(ctx, tempFile)
@@ -54,6 +60,8 @@ func TestFileStorage(t *testing.T) {
 	})
 
 	t.Run("Формат файла", func(t *testing.T) {
+		store.Clear()
+
 		content, err := os.ReadFile(tempFile)
 		require.NoError(t, err)
 
@@ -68,14 +76,11 @@ func TestFileStorage(t *testing.T) {
 	})
 
 	t.Run("Ping", func(t *testing.T) {
-		// Тест для существующего файла
-		err := store.SaveURL(ctx, "test", "https://example.com") // Сохраняем URL, чтобы создать файл
-		require.NoError(t, err)
+		store.Clear()
 
-		err = store.Ping(ctx)
+		err := store.Ping(ctx)
 		assert.NoError(t, err, "Ping должен быть успешным для существующего файла")
 
-		// Тест для несуществующего файла
 		nonExistentFile := filepath.Join(tempDir, "non_existent.json")
 		storeNonExistent, err := NewFileStorage(ctx, nonExistentFile)
 		require.NoError(t, err, "Создание FileStorage для несуществующего файла не должно вызывать ошибку")
@@ -85,9 +90,11 @@ func TestFileStorage(t *testing.T) {
 	})
 
 	t.Run("GetShortIDByLongURL", func(t *testing.T) {
-		shortID := "def456"
-		longURL := "https://example.org"
-		err := store.SaveURL(ctx, shortID, longURL)
+		store.Clear()
+
+		shortID := "jkl012"
+		longURL := "https://example.edu"
+		err := store.SaveURL(ctx, shortID, longURL, "")
 		assert.NoError(t, err)
 
 		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL)
@@ -98,6 +105,29 @@ func TestFileStorage(t *testing.T) {
 		resultShortID, err = store.GetShortIDByLongURL(ctx, nonExistentURL)
 		assert.NoError(t, err)
 		assert.Empty(t, resultShortID)
+	})
+
+	t.Run("SaveURLBatch и GetUserURLs", func(t *testing.T) {
+		store.Clear()
+
+		urls := map[string]string{
+			"mno345": "https://batch1.com",
+			"pqr678": "https://batch2.com",
+		}
+		userID := "user2"
+
+		err := store.SaveURLBatch(ctx, urls, userID)
+		assert.NoError(t, err)
+
+		userURLs, err := store.GetUserURLs(ctx, userID)
+		assert.NoError(t, err)
+		assert.Len(t, userURLs, 2) // Убедитесь, что возвращаются только 2 URL для пользователя
+
+		for _, urlData := range userURLs {
+			originalURL, exists := urls[urlData.ShortURL]
+			assert.True(t, exists)
+			assert.Equal(t, originalURL, urlData.OriginalURL)
+		}
 	})
 }
 

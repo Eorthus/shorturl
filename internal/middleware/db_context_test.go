@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -15,8 +16,8 @@ type MockStorage struct {
 	mock.Mock
 }
 
-func (m *MockStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
-	args := m.Called(ctx, shortID, longURL)
+func (m *MockStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
+	args := m.Called(ctx, shortID, longURL, userID)
 	return args.Error(0)
 }
 
@@ -30,14 +31,19 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
-	args := m.Called(ctx, urls)
+func (m *MockStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
+	args := m.Called(ctx, urls, userID)
 	return args.Error(0)
 }
 
 func (m *MockStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
 	args := m.Called(ctx, longURL)
 	return args.String(0), args.Error(1)
+}
+
+func (m *MockStorage) GetUserURLs(ctx context.Context, userID string) ([]storage.URLData, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]storage.URLData), args.Error(1)
 }
 
 func TestDBContextMiddleware(t *testing.T) {

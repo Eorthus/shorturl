@@ -48,8 +48,9 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	userID, _ := r.Context().Value("userID").(string)
 	if len(urlMap) > 0 {
-		err := h.Store.SaveURLBatch(r.Context(), urlMap)
+		err := h.Store.SaveURLBatch(r.Context(), urlMap, userID)
 		if err != nil {
 			apperrors.HandleHTTPError(w, err, h.Logger)
 			return
@@ -59,4 +60,26 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(responses)
+}
+
+func (h *Handler) HandleUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		apperrors.HandleHTTPError(w, apperrors.ErrUnauthorized, h.Logger)
+		return
+	}
+
+	urls, err := h.Store.GetUserURLs(r.Context(), userID)
+	if err != nil {
+		apperrors.HandleHTTPError(w, err, h.Logger)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
 }

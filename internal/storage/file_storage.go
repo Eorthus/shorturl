@@ -10,6 +10,7 @@ import (
 type FileStorage struct {
 	filePath string
 	data     map[string]URLData
+	userURLs map[string][]string
 	mutex    sync.RWMutex
 }
 
@@ -17,6 +18,7 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	fs := &FileStorage{
 		filePath: filePath,
 		data:     make(map[string]URLData),
+		userURLs: make(map[string][]string),
 	}
 
 	// Проверяем существование файла, но не создаем его
@@ -34,16 +36,21 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
+func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
 	urlData := URLData{
 		ShortURL:    shortID,
 		OriginalURL: longURL,
+		UserID:      userID,
 	}
 
 	fs.data[shortID] = urlData
+	// Сохраняем в userURLs только если userID не пустой
+	if userID != "" {
+		fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
+	}
 
 	return fs.saveToFile(ctx)
 }
@@ -60,18 +67,41 @@ func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool
 	return urlData.OriginalURL, true
 }
 
-func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
+func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
 	for shortID, longURL := range urls {
-		fs.data[shortID] = URLData{
+		urlData := URLData{
 			ShortURL:    shortID,
 			OriginalURL: longURL,
+			UserID:      userID,
+		}
+		fs.data[shortID] = urlData
+		// Сохраняем в userURLs только если userID не пустой
+		if userID != "" {
+			fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
 		}
 	}
 
 	return fs.saveToFile(ctx)
+}
+
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	var urls []URLData
+	for _, shortID := range fs.userURLs[userID] {
+		if urlData, exists := fs.data[shortID]; exists {
+			urls = append(urls, URLData{
+				ShortURL:    urlData.ShortURL,
+				OriginalURL: urlData.OriginalURL,
+			})
+		}
+	}
+
+	return urls, nil
 }
 
 func (fs *FileStorage) Ping(ctx context.Context) error {
@@ -143,4 +173,12 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 		}
 	}
 	return "", nil
+}
+
+func (fs *FileStorage) Clear() {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	fs.data = make(map[string]URLData)
+	fs.userURLs = make(map[string][]string)
 }

@@ -38,6 +38,24 @@ func TestHandleHTTPError(t *testing.T) {
 			expectedBody:   "Invalid URL format\n",
 		},
 		{
+			name:           "Invalid JSON format",
+			err:            ErrInvalidJSONFormat,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid JSON format\n",
+		},
+		{
+			name:           "Empty URL",
+			err:            ErrEmptyURL,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Empty URL\n",
+		},
+		{
+			name:           "Unauthorized",
+			err:            ErrUnauthorized,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "Unauthorized\n",
+		},
+		{
 			name:           "Unknown error",
 			err:            errors.New("unknown error"),
 			expectedStatus: http.StatusInternalServerError,
