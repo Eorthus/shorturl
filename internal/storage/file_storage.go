@@ -10,6 +10,7 @@ import (
 type FileStorage struct {
 	filePath string
 	data     map[string]URLData
+	userURLs map[string][]string
 	mutex    sync.RWMutex
 }
 
@@ -17,6 +18,7 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	fs := &FileStorage{
 		filePath: filePath,
 		data:     make(map[string]URLData),
+		userURLs: make(map[string][]string),
 	}
 
 	// Проверяем существование файла, но не создаем его
@@ -34,7 +36,7 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
+func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -44,6 +46,7 @@ func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) err
 	}
 
 	fs.data[shortID] = urlData
+	fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
 
 	return fs.saveToFile(ctx)
 }
@@ -60,7 +63,7 @@ func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool
 	return urlData.OriginalURL, true
 }
 
-func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
+func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -69,6 +72,7 @@ func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string)
 			ShortURL:    shortID,
 			OriginalURL: longURL,
 		}
+		fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
 	}
 
 	return fs.saveToFile(ctx)
@@ -143,4 +147,19 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 		}
 	}
 	return "", nil
+}
+
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	shortIDs := fs.userURLs[userID]
+	urls := make([]URLData, 0, len(shortIDs))
+	for _, shortID := range shortIDs {
+		if urlData, exists := fs.data[shortID]; exists {
+			urls = append(urls, urlData)
+		}
+	}
+
+	return urls, nil
 }
