@@ -21,6 +21,10 @@ func TestAuthMiddleware(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
+		// Получаем результат и закрываем тело ответа
+		result := rr.Result()
+		defer result.Body.Close()
+
 		// Проверяем, что запрос был обработан успешно
 		assert.Equal(t, http.StatusOK, rr.Code)
 
