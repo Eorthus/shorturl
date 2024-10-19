@@ -76,6 +76,8 @@ func (h *Handler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	if len(urls) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -85,6 +87,5 @@ func (h *Handler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 		urls[i].ShortURL = h.BaseURL + "/" + urls[i].ShortURL
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(urls)
 }
