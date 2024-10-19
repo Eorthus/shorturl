@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Eorthus/shorturl/internal/apperrors"
+	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/Eorthus/shorturl/internal/utils"
 )
 
@@ -68,7 +69,7 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleUserURLs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
 	if !ok || userID == "" {
 		apperrors.HandleHTTPError(w, apperrors.ErrUnauthorized, h.Logger)
 		return

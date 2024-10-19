@@ -15,7 +15,7 @@ func TestAuthMiddleware(t *testing.T) {
 	t.Run("New user without cookie", func(t *testing.T) {
 		handler := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Проверяем, что userID был установлен в контекст
-			userID, ok := r.Context().Value(authContextKey).(string)
+			userID, ok := r.Context().Value(UserIDContextKey).(string)
 			assert.True(t, ok, "userID should be present in the context")
 			assert.NotEmpty(t, userID, "userID should not be empty")
 			w.WriteHeader(http.StatusOK)
@@ -44,7 +44,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 		handler := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Проверяем, что userID был установлен в контекст
-			cookieUserID, ok := r.Context().Value(authContextKey).(string)
+			cookieUserID, ok := r.Context().Value(UserIDContextKey).(string)
 			assert.True(t, ok, "userID should be present in the context")
 
 			// Декодируем значение из куки и сравниваем его с контекстом
@@ -80,7 +80,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 		handler := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Проверяем, что был создан новый userID и добавлен в контекст
-			userID, ok := r.Context().Value(authContextKey).(string)
+			userID, ok := r.Context().Value(UserIDContextKey).(string)
 			assert.True(t, ok, "userID should be present in the context")
 			assert.NotEmpty(t, userID, "userID should not be empty")
 			assert.NotEqual(t, "invalid_value", userID, "userID should not be equal to the invalid cookie value")

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -123,7 +124,7 @@ func TestHandleUserURLs(t *testing.T) {
 			req, err := http.NewRequest("GET", "/api/user/urls", nil)
 			require.NoError(t, err)
 
-			req = req.WithContext(context.WithValue(req.Context(), "userID", tt.userID))
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.userID))
 
 			rr := httptest.NewRecorder()
 			r.ServeHTTP(rr, req)
