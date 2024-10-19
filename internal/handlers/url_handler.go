@@ -76,16 +76,19 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidJSONFormat, h.Logger)
 		return
 	}
 
 	if request.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrEmptyURL, h.Logger)
 		return
 	}
 
 	if !strings.HasPrefix(request.URL, "http://") && !strings.HasPrefix(request.URL, "https://") {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
 		return
 	}
@@ -95,12 +98,14 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	// Проверяем, существует ли уже такой URL
 	existingShortID, err := h.Store.GetShortIDByLongURL(r.Context(), request.URL)
 	if err != nil && err != apperrors.ErrNoSuchURL {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
 	if existingShortID != "" {
 		// URL уже существует, возвращаем его с кодом 409 Conflict
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{"result": h.BaseURL + "/" + existingShortID})
 		return
@@ -111,6 +116,7 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 
 	err = h.Store.SaveURL(r.Context(), shortID, request.URL, userID)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
