@@ -19,10 +19,26 @@ func TestDatabaseStorage(t *testing.T) {
 	store := &DatabaseStorage{db: db}
 	ctx := context.Background()
 
+	// Очистка базы данных в конце всех тестов
+	defer func() {
+		mock.ExpectExec("DELETE FROM urls").WillReturnResult(sqlmock.NewResult(0, 0))
+		_, err := db.Exec("DELETE FROM urls")
+		require.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet(), "Expectations were not met for database cleanup")
+	}()
+
+	t.Run("Ping", func(t *testing.T) {
+		mock.ExpectPing()
+		err := store.Ping(ctx)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("SaveURL with userID", func(t *testing.T) {
-		shortID := "abc123"
-		longURL := "https://example.com"
-		userID := "user1"
+		shortID := "shortID_123"
+		longURL := "https://example123.com"
+		userID := "user_123"
+
 		mock.ExpectExec("INSERT INTO urls").
 			WithArgs(shortID, longURL, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
@@ -33,9 +49,10 @@ func TestDatabaseStorage(t *testing.T) {
 	})
 
 	t.Run("GetURL - Existing", func(t *testing.T) {
-		shortID := "abc123"
-		longURL := "https://example.com"
+		shortID := "shortID_456"
+		longURL := "https://example456.com"
 		rows := sqlmock.NewRows([]string{"original_url"}).AddRow(longURL)
+
 		mock.ExpectQuery("SELECT original_url FROM urls WHERE short_id = \\$1").
 			WithArgs(shortID).
 			WillReturnRows(rows)
@@ -47,7 +64,7 @@ func TestDatabaseStorage(t *testing.T) {
 	})
 
 	t.Run("GetURL - Non-existing", func(t *testing.T) {
-		shortID := "nonexistent"
+		shortID := "nonexistent_789"
 
 		mock.ExpectQuery("SELECT original_url FROM urls WHERE short_id = \\$1").
 			WithArgs(shortID).
@@ -56,28 +73,25 @@ func TestDatabaseStorage(t *testing.T) {
 		resultURL, exists := store.GetURL(ctx, shortID)
 		assert.False(t, exists)
 		assert.Empty(t, resultURL)
-	})
-
-	t.Run("Ping", func(t *testing.T) {
-		mock.ExpectPing()
-		err := store.Ping(ctx)
-		assert.NoError(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
 	t.Run("SaveURLBatch with userID", func(t *testing.T) {
 		urls := map[string]string{
-			"abc123": "https://example.com",
-			"def456": "https://example.org",
+			"shortID_abc": "https://example_abc.com",
+			"shortID_def": "https://example_def.com",
 		}
+		userID := "user_abc"
 
-		userID := "user1"
 		mock.ExpectBegin()
 		mock.ExpectPrepare("INSERT INTO urls")
+
 		for shortID, longURL := range urls {
 			mock.ExpectExec("INSERT INTO urls").
 				WithArgs(shortID, longURL, userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 		}
+
 		mock.ExpectCommit()
 
 		err := store.SaveURLBatch(ctx, urls, userID)
@@ -86,9 +100,10 @@ func TestDatabaseStorage(t *testing.T) {
 	})
 
 	t.Run("GetShortIDByLongURL - Existing", func(t *testing.T) {
-		longURL := "https://example.com"
-		expectedShortID := "abc123"
+		longURL := "https://example_existing.com"
+		expectedShortID := "shortID_existing"
 		rows := sqlmock.NewRows([]string{"short_id"}).AddRow(expectedShortID)
+
 		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = \\$1").
 			WithArgs(longURL).
 			WillReturnRows(rows)
@@ -101,6 +116,7 @@ func TestDatabaseStorage(t *testing.T) {
 
 	t.Run("GetShortIDByLongURL - Non-existing", func(t *testing.T) {
 		longURL := "https://nonexistent.com"
+
 		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = \\$1").
 			WithArgs(longURL).
 			WillReturnError(sql.ErrNoRows)
@@ -113,13 +129,14 @@ func TestDatabaseStorage(t *testing.T) {
 
 	t.Run("GetUserURLs", func(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"short_id", "original_url"}).
-			AddRow("abc123", "https://example.com").
-			AddRow("def456", "https://example.org")
+			AddRow("shortID_user", "https://example_user.com").
+			AddRow("shortID_user2", "https://example_user2.com")
+
 		mock.ExpectQuery("SELECT short_id, original_url FROM urls WHERE user_id = \\$1").
-			WithArgs("user1").
+			WithArgs("user_123").
 			WillReturnRows(rows)
 
-		urls, err := store.GetUserURLs(ctx, "user1")
+		urls, err := store.GetUserURLs(ctx, "user_123")
 		assert.NoError(t, err)
 		assert.Len(t, urls, 2)
 		assert.NoError(t, mock.ExpectationsWereMet())
