@@ -12,13 +12,14 @@ import (
 func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	var requests []BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		w.Header().Set("Content-Type", "application/json") // Устанавливаем правильный Content-Type
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
 		return
 	}
 
 	if len(requests) == 0 {
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest) // Изменено на StatusBadRequest
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
 		return
 	}
@@ -29,14 +30,15 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	for _, req := range requests {
 		if !strings.HasPrefix(req.OriginalURL, "http://") && !strings.HasPrefix(req.OriginalURL, "https://") {
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest) // Изменено на StatusBadRequest
 			apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
 			return
 		}
 
-		// Проверка существования URL
+		// Проверяем существование URL
 		shortID, exists, err := utils.CheckURLExists(r.Context(), h.Store, req.OriginalURL)
 		if err != nil && err != apperrors.ErrNoSuchURL {
-			// Возвращаем ошибку только в случае реальной ошибки, а не отсутствия URL
+			// Возвращаем ошибку только в случае реальной ошибки, а не если URL не найден
 			w.Header().Set("Content-Type", "application/json")
 			apperrors.HandleHTTPError(w, err, h.Logger)
 			return
@@ -68,7 +70,7 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 
 	// Формируем правильный ответ
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusCreated) // Изменено на StatusCreated
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 	}
