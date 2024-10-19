@@ -7,6 +7,9 @@ import (
 	"github.com/Eorthus/shorturl/internal/auth"
 )
 
+// Создаем константу для ключа контекста
+const authContextKey contextKey = "userID"
+
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var userID string
@@ -26,7 +29,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Устанавливаем в контекст декодированное значение userID
-		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx := context.WithValue(r.Context(), authContextKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

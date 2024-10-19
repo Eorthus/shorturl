@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Определяем тип для ключа контекста
+type contextKey string
+
+// Создаем константу для ключа контекста
+const urlContextKey contextKey = "userID"
+
 func TestHandlePost(t *testing.T) {
 	r, store := setupRouter(t)
 
@@ -40,7 +46,7 @@ func TestHandlePost(t *testing.T) {
 			require.NoError(t, err)
 
 			// Добавляем userID в контекст запроса
-			ctx := context.WithValue(req.Context(), "userID", "testuser")
+			ctx := context.WithValue(req.Context(), urlContextKey, "testuser")
 			req = req.WithContext(ctx)
 
 			rr := httptest.NewRecorder()
@@ -142,7 +148,7 @@ func TestHandleJSONPost(t *testing.T) {
 			require.NoError(t, err)
 
 			// Добавляем userID в контекст запроса
-			ctx := context.WithValue(req.Context(), "userID", "testuser")
+			ctx := context.WithValue(req.Context(), urlContextKey, "testuser")
 			req = req.WithContext(ctx)
 
 			req.Header.Set("Content-Type", "application/json")
