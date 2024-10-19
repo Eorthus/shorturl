@@ -14,6 +14,7 @@ import (
 
 func TestGzipMiddleware(t *testing.T) {
 	t.Run("Сжатие ответа", func(t *testing.T) {
+		t.Parallel()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("hello world"))
 		})
@@ -36,6 +37,7 @@ func TestGzipMiddleware(t *testing.T) {
 	})
 
 	t.Run("Распаковка запроса", func(t *testing.T) {
+		t.Parallel()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -62,6 +64,7 @@ func TestGzipMiddleware(t *testing.T) {
 	})
 
 	t.Run("Без сжатия, когда клиент не поддерживает", func(t *testing.T) {
+		t.Parallel()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("hello world"))
 		})
@@ -76,6 +79,7 @@ func TestGzipMiddleware(t *testing.T) {
 	})
 
 	t.Run("Без распаковки для несжатого запроса", func(t *testing.T) {
+		t.Parallel()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
