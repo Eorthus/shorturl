@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
@@ -55,6 +56,8 @@ func (s *DatabaseStorage) Close() error {
 }
 
 func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, userID string) error {
+	log.Printf("Saving URL: shortID=%s, longURL=%s, userID=%s", shortID, longURL, userID)
+
 	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)", shortID, longURL, userID)
 	if err != nil {
 		pqErr, ok := err.(*pq.Error)
@@ -122,6 +125,7 @@ func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL strin
 }
 
 func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+	log.Printf("Fetching URLs for userID: %s", userID)
 	rows, err := s.db.QueryContext(ctx, "SELECT short_id, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user URLs: %w", err)
@@ -136,7 +140,7 @@ func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URL
 		}
 		urls = append(urls, url)
 	}
-
+	log.Printf("Found %d URLs for userID: %s", len(urls), userID)
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating URL rows: %w", err)
 	}

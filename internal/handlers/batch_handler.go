@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -65,6 +66,7 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
+	log.Printf("Handling request for userID: %s", userID)
 	if userID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
