@@ -26,10 +26,10 @@ func TestAuthMiddleware(t *testing.T) {
 		defer result.Body.Close()
 
 		// Проверяем, что запрос был обработан успешно
-		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, http.StatusOK, result.StatusCode)
 
 		// Проверяем, что был установлен хотя бы один cookie
-		cookies := rr.Result().Cookies()
+		cookies := result.Cookies()
 		assert.NotEmpty(t, cookies, "At least one cookie should be set")
 	})
 }
