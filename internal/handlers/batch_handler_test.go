@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -65,6 +66,78 @@ func TestHandleBatchShorten(t *testing.T) {
 					assert.True(t, strings.HasPrefix(item.ShortURL, "http://localhost:8080/"),
 						"ShortURL should start with base URL")
 				}
+			}
+		})
+	}
+}
+
+func TestHandleUserURLs(t *testing.T) {
+	r, store := setupRouter(t)
+
+	tests := []struct {
+		name           string
+		userID         string
+		setupStore     func()
+		expectedStatus int
+		expectedBody   []respPair
+	}{
+		{
+			name:   "Valid user URLs",
+			userID: "user-with-urls",
+			setupStore: func() {
+				store.SaveURL(context.Background(), "short1", "https://example.com", "user-with-urls")
+				store.SaveURL(context.Background(), "short2", "https://example.org", "user-with-urls")
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: []respPair{
+				{
+					ShortURL:    "http://localhost:8080/short1",
+					OriginalURL: "https://example.com",
+				},
+				{
+					ShortURL:    "http://localhost:8080/short2",
+					OriginalURL: "https://example.org",
+				},
+			},
+		},
+		{
+			name:           "Empty user URLs",
+			userID:         "user-without-urls",
+			setupStore:     func() {},
+			expectedStatus: http.StatusNoContent,
+			expectedBody:   []respPair{},
+		},
+		{
+			name:           "Unauthorized",
+			userID:         "",
+			setupStore:     func() {},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   []respPair{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupStore()
+
+			req, err := http.NewRequest("GET", "/api/user/urls", nil)
+			require.NoError(t, err)
+
+			req = req.WithContext(context.WithValue(req.Context(), "userID", tt.userID))
+
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
+
+			if tt.expectedStatus == http.StatusOK {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"), "handler returned wrong content type")
+
+				var response []respPair
+				err = json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err, "failed to unmarshal response")
+
+				assert.Equal(t, tt.expectedBody, response, "response body differs")
 			}
 		})
 	}

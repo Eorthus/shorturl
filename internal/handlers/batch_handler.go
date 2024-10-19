@@ -9,6 +9,11 @@ import (
 	"github.com/Eorthus/shorturl/internal/utils"
 )
 
+type respPair struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	var requests []BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
@@ -65,24 +70,34 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok || userID == "" {
-		// Устанавливаем правильный Content-Type перед отправкой ошибки
-		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrUnauthorized, h.Logger)
 		return
 	}
 
 	urls, err := h.Store.GetUserURLs(r.Context(), userID)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
-	if len(urls) == 0 {
+	respPairs := make([]respPair, 0, len(urls))
+	for _, url := range urls {
+		respPairs = append(respPairs, respPair{
+			ShortURL:    h.BaseURL + "/" + url.ShortURL,
+			OriginalURL: url.OriginalURL,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if len(respPairs) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(urls)
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(respPairs); err != nil {
+		apperrors.HandleHTTPError(w, err, h.Logger)
+		return
+	}
 }
