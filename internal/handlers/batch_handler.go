@@ -65,12 +65,15 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok || userID == "" {
+		// Устанавливаем правильный Content-Type перед отправкой ошибки
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, apperrors.ErrUnauthorized, h.Logger)
 		return
 	}
 
 	urls, err := h.Store.GetUserURLs(r.Context(), userID)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
