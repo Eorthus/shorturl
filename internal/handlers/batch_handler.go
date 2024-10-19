@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"github.com/Eorthus/shorturl/internal/apperrors"
+	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/Eorthus/shorturl/internal/utils"
 )
 
 func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	var requests []BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
@@ -49,7 +51,7 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(urlMap) > 0 {
-		err := h.Store.SaveURLBatch(r.Context(), urlMap)
+		err := h.Store.SaveURLBatch(r.Context(), urlMap, userID)
 		if err != nil {
 			apperrors.HandleHTTPError(w, err, h.Logger)
 			return
@@ -59,4 +61,30 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(responses)
+}
+
+func (h *Handler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := h.Store.GetUserURLs(r.Context(), userID)
+	if err != nil {
+		apperrors.HandleHTTPError(w, err, h.Logger)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	for i := range urls {
+		urls[i].ShortURL = h.BaseURL + "/" + urls[i].ShortURL
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
 }

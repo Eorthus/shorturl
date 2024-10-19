@@ -21,12 +21,13 @@ func TestDatabaseStorage(t *testing.T) {
 	t.Run("SaveURL", func(t *testing.T) {
 		shortID := "abc123"
 		longURL := "https://example.com"
+		userID := "user1"
 
 		mock.ExpectExec("INSERT INTO urls").
-			WithArgs(shortID, longURL).
+			WithArgs(shortID, longURL, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 	})
 
@@ -74,17 +75,18 @@ func TestDatabaseStorage(t *testing.T) {
 			"abc123": "https://example.com",
 			"def456": "https://example.org",
 		}
+		userID := "user1"
 
 		mock.ExpectBegin()
 		mock.ExpectPrepare("INSERT INTO urls")
-		for range urls {
+		for shortID, longURL := range urls {
 			mock.ExpectExec("INSERT INTO urls").
-				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+				WithArgs(shortID, longURL, userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 		}
 		mock.ExpectCommit()
 
-		err = store.SaveURLBatch(ctx, urls)
+		err = store.SaveURLBatch(context.Background(), urls, userID)
 		assert.NoError(t, err)
 
 		err = mock.ExpectationsWereMet()
@@ -115,5 +117,26 @@ func TestDatabaseStorage(t *testing.T) {
 		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
 		assert.NoError(t, err)
 		assert.Empty(t, shortID)
+	})
+
+	t.Run("GetUserURLs", func(t *testing.T) {
+		userID := "user1"
+		expectedURLs := []URLData{
+			{ShortURL: "abc123", OriginalURL: "https://example.com"},
+			{ShortURL: "def456", OriginalURL: "https://example.org"},
+		}
+
+		rows := sqlmock.NewRows([]string{"short_id", "original_url"})
+		for _, url := range expectedURLs {
+			rows.AddRow(url.ShortURL, url.OriginalURL)
+		}
+
+		mock.ExpectQuery("SELECT short_id, original_url FROM urls WHERE user_id = ?").
+			WithArgs(userID).
+			WillReturnRows(rows)
+
+		urls, err := store.GetUserURLs(ctx, userID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURLs, urls)
 	})
 }

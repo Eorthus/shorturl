@@ -30,13 +30,19 @@ func TestHandlePost(t *testing.T) {
 
 	// Предварительно сохраним URL для теста дубликата
 	ctx := context.Background()
-	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com", "testuser")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, err := http.NewRequest("POST", "/", bytes.NewBufferString(tt.url))
 			require.NoError(t, err)
+
+			// Добавляем куки для аутентификации
+			req.AddCookie(&http.Cookie{
+				Name:  "user_token",
+				Value: "testuser:testsignature",
+			})
 
 			rr := httptest.NewRecorder()
 			r.ServeHTTP(rr, req)
@@ -57,7 +63,7 @@ func TestHandleGet(t *testing.T) {
 	ctx := context.Background()
 	shortID := "testid"
 	longURL := "https://example.com"
-	err := store.SaveURL(ctx, shortID, longURL)
+	err := store.SaveURL(ctx, shortID, longURL, "testuser")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -125,7 +131,7 @@ func TestHandleJSONPost(t *testing.T) {
 
 	// Предварительно сохраним URL для теста дубликата
 	ctx := context.Background()
-	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com")
+	err := store.SaveURL(ctx, "duplicate", "https://duplicate.com", "testuser")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
@@ -134,6 +140,12 @@ func TestHandleJSONPost(t *testing.T) {
 			require.NoError(t, err)
 
 			req.Header.Set("Content-Type", "application/json")
+
+			// Добавляем куки для аутентификации
+			req.AddCookie(&http.Cookie{
+				Name:  "user_token",
+				Value: "testuser:testsignature",
+			})
 
 			rr := httptest.NewRecorder()
 			r.ServeHTTP(rr, req)

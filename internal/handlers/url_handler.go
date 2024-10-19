@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	"github.com/Eorthus/shorturl/internal/apperrors"
+	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/Eorthus/shorturl/internal/utils"
 	"github.com/go-chi/chi/v5"
 )
 
 func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
@@ -25,23 +27,25 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID, _, err := utils.CheckURLExists(r.Context(), h.Store, longURL)
+	shortID, status, err := utils.CheckURLExists(r.Context(), h.Store, longURL)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
-	if shortID != "" {
+	if status == http.StatusConflict {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(h.BaseURL + "/" + shortID))
 		return
 	}
 
-	shortID = utils.GenerateShortID()
-	err = h.Store.SaveURL(r.Context(), shortID, longURL)
-	if err != nil {
-		apperrors.HandleHTTPError(w, err, h.Logger)
-		return
+	if shortID == "" {
+		shortID = utils.GenerateShortID()
+		err = h.Store.SaveURL(r.Context(), shortID, longURL, userID)
+		if err != nil {
+			apperrors.HandleHTTPError(w, err, h.Logger)
+			return
+		}
 	}
 
 	shortURL := h.BaseURL + "/" + shortID
@@ -64,6 +68,7 @@ func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	var request struct {
 		URL string `json:"url"`
 	}
@@ -84,7 +89,7 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID, _, err := utils.CheckURLExists(r.Context(), h.Store, request.URL)
+	shortID, status, err := utils.CheckURLExists(r.Context(), h.Store, request.URL)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
@@ -92,7 +97,7 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 
 	var response ShortenResponse
 
-	if shortID != "" {
+	if status == http.StatusConflict {
 		response.Result = h.BaseURL + "/" + shortID
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
@@ -100,11 +105,13 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortID = utils.GenerateShortID()
-	err = h.Store.SaveURL(r.Context(), shortID, request.URL)
-	if err != nil {
-		apperrors.HandleHTTPError(w, err, h.Logger)
-		return
+	if shortID == "" {
+		shortID = utils.GenerateShortID()
+		err = h.Store.SaveURL(r.Context(), shortID, request.URL, userID)
+		if err != nil {
+			apperrors.HandleHTTPError(w, err, h.Logger)
+			return
+		}
 	}
 
 	response.Result = h.BaseURL + "/" + shortID

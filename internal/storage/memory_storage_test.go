@@ -17,8 +17,9 @@ func TestMemoryStorage(t *testing.T) {
 	t.Run("SaveURL and GetURL", func(t *testing.T) {
 		shortID := "abc123"
 		longURL := "https://example.com"
+		userID := "user1"
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		resultURL, exists := store.GetURL(ctx, shortID)
@@ -39,8 +40,9 @@ func TestMemoryStorage(t *testing.T) {
 			"def456": "https://example.org",
 			"ghi789": "https://example.net",
 		}
+		userID := "user2"
 
-		err := store.SaveURLBatch(ctx, urls)
+		err := store.SaveURLBatch(ctx, urls, userID)
 		assert.NoError(t, err)
 
 		for shortID, longURL := range urls {
@@ -58,8 +60,9 @@ func TestMemoryStorage(t *testing.T) {
 			go func(id int) {
 				shortID := fmt.Sprintf("concurrent%d", id)
 				longURL := fmt.Sprintf("https://concurrent%d.com", id)
+				userID := fmt.Sprintf("user%d", id)
 
-				err := store.SaveURL(ctx, shortID, longURL)
+				err := store.SaveURL(ctx, shortID, longURL, userID)
 				assert.NoError(t, err)
 
 				resultURL, exists := store.GetURL(ctx, shortID)
@@ -78,8 +81,9 @@ func TestMemoryStorage(t *testing.T) {
 	t.Run("GetShortIDByLongURL", func(t *testing.T) {
 		shortID := "test123"
 		longURL := "https://testexample.com"
+		userID := "user3"
 
-		err := store.SaveURL(ctx, shortID, longURL)
+		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
 		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL)
@@ -93,26 +97,68 @@ func TestMemoryStorage(t *testing.T) {
 	})
 
 	t.Run("Duplicate SaveURL", func(t *testing.T) {
+		store, _ := NewMemoryStorage(context.Background())
 		shortID := "duplicate"
 		longURL1 := "https://example1.com"
 		longURL2 := "https://example2.com"
+		userID := "user4"
 
-		err := store.SaveURL(ctx, shortID, longURL1)
+		// Сохраняем первый URL
+		err := store.SaveURL(context.Background(), shortID, longURL1, userID)
 		assert.NoError(t, err)
 
-		err = store.SaveURL(ctx, shortID, longURL2)
-		assert.NoError(t, err)
+		// Пытаемся сохранить второй URL с тем же shortID
+		err = store.SaveURL(context.Background(), shortID, longURL2, userID)
+		assert.Equal(t, ErrURLExists, err)
 
-		resultURL, exists := store.GetURL(ctx, shortID)
+		// Проверяем, что сохранен первый URL
+		resultURL, exists := store.GetURL(context.Background(), shortID)
 		assert.True(t, exists)
-		assert.Equal(t, longURL2, resultURL)
+		assert.Equal(t, longURL1, resultURL)
 
-		resultShortID, err := store.GetShortIDByLongURL(ctx, longURL2)
+		// Проверяем, что можно получить shortID по первому longURL
+		resultShortID, err := store.GetShortIDByLongURL(context.Background(), longURL1)
 		assert.NoError(t, err)
 		assert.Equal(t, shortID, resultShortID)
 
-		resultShortID, err = store.GetShortIDByLongURL(ctx, longURL1)
+		// Проверяем, что нельзя получить shortID по второму longURL
+		resultShortID, err = store.GetShortIDByLongURL(context.Background(), longURL2)
 		assert.NoError(t, err)
 		assert.Empty(t, resultShortID)
+
+		// Пытаемся сохранить тот же URL еще раз
+		err = store.SaveURL(context.Background(), "another-short-id", longURL1, userID)
+		assert.Equal(t, ErrURLExists, err)
+	})
+
+	t.Run("GetUserURLs", func(t *testing.T) {
+		store, _ := NewMemoryStorage(context.Background())
+		userID := "user5"
+		urls := []struct {
+			shortID string
+			longURL string
+		}{
+			{"user5a", "https://user5a.com"},
+			{"user5b", "https://user5b.com"},
+		}
+
+		for _, u := range urls {
+			err := store.SaveURL(context.Background(), u.shortID, u.longURL, userID)
+			assert.NoError(t, err)
+		}
+
+		userURLs, err := store.GetUserURLs(context.Background(), userID)
+		assert.NoError(t, err)
+		assert.Len(t, userURLs, len(urls), "Количество URL пользователя должно совпадать")
+
+		for i, u := range urls {
+			assert.Equal(t, u.shortID, userURLs[i].ShortURL)
+			assert.Equal(t, u.longURL, userURLs[i].OriginalURL)
+		}
+
+		// Проверка для несуществующего пользователя
+		nonExistentUserURLs, err := store.GetUserURLs(context.Background(), "nonexistent")
+		assert.NoError(t, err)
+		assert.Empty(t, nonExistentUserURLs, "Для несуществующего пользователя список URL должен быть пустым")
 	})
 }

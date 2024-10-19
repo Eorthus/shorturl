@@ -45,11 +45,13 @@ func main() {
 	r.Use(middleware.GzipMiddleware)
 	r.Use(middleware.APIContextMiddleware(10 * time.Second))
 	r.Use(middleware.DBContextMiddleware(store))
+	r.Use(middleware.AuthMiddleware) // Добавляем middleware аутентификации
 
 	r.Group(func(r chi.Router) {
 		r.Use(logger.GETLogger(zapLogger))
 		r.Get("/{shortID}", handler.HandleGet)
 		r.Get("/ping", handler.HandlePing)
+		r.Get("/api/user/urls", handler.HandleGetUserURLs) // Новый handler
 	})
 
 	// Применяем логгер для всех POST запросов

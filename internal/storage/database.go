@@ -53,8 +53,11 @@ func (s *DatabaseStorage) Close() error {
 	return s.db.Close()
 }
 
-func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
-	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url) VALUES ($1, $2)", shortID, longURL)
+func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, userID string) error {
+	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)", shortID, longURL, userID)
+	if err != nil {
+		return fmt.Errorf("failed to execute statement: %w", err)
+	}
 	if err != nil {
 		pqErr, ok := err.(*pq.Error)
 		if ok && pqErr.Code == pgerrcode.UniqueViolation {
@@ -83,21 +86,21 @@ func (s *DatabaseStorage) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
-func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
+func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO urls (short_id, original_url) VALUES ($1, $2)")
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)")
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer stmt.Close()
 
 	for shortID, longURL := range urls {
-		_, err = stmt.ExecContext(ctx, shortID, longURL)
+		_, err = stmt.ExecContext(ctx, shortID, longURL, userID)
 		if err != nil {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}
@@ -116,4 +119,27 @@ func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL strin
 		return "", fmt.Errorf("failed to get short ID: %w", err)
 	}
 	return shortID, nil
+}
+
+func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT short_id, original_url FROM urls WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user URLs: %w", err)
+	}
+	defer rows.Close()
+
+	var urls []URLData
+	for rows.Next() {
+		var url URLData
+		if err := rows.Scan(&url.ShortURL, &url.OriginalURL); err != nil {
+			return nil, fmt.Errorf("failed to scan URL data: %w", err)
+		}
+		urls = append(urls, url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating URL rows: %w", err)
+	}
+
+	return urls, nil
 }
