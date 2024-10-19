@@ -64,33 +64,27 @@ func TestDatabaseStorage(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("SaveURLBatch", func(t *testing.T) {
-		db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
-		require.NoError(t, err)
-		defer db.Close()
-
-		store := &DatabaseStorage{db: db}
-
+	t.Run("SaveURLBatch with userID", func(t *testing.T) {
 		urls := map[string]string{
 			"abc123": "https://example.com",
 			"def456": "https://example.org",
 		}
 		userID := "user1"
 
-		mock.ExpectBegin()
+		mock.ExpectBegin() // Ожидание начала транзакции
+
 		mock.ExpectPrepare("INSERT INTO urls")
 		for shortID, longURL := range urls {
 			mock.ExpectExec("INSERT INTO urls").
 				WithArgs(shortID, longURL, userID).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 		}
-		mock.ExpectCommit()
 
-		err = store.SaveURLBatch(context.Background(), urls, userID)
-		assert.NoError(t, err)
+		mock.ExpectCommit() // Ожидание коммита транзакции
 
-		err = mock.ExpectationsWereMet()
+		err := store.SaveURLBatch(ctx, urls, userID)
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("GetShortIDByLongURL - Existing", func(t *testing.T) {
