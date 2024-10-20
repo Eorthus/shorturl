@@ -4,19 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"sync"
 )
 
 type FileStorage struct {
-	filePath string
-	data     map[string]URLData
-	mutex    sync.RWMutex
+	filePath    string
+	data        map[string]URLData
+	userURLs    map[string][]string
+	deletedURLs map[string]bool
+	mutex       sync.RWMutex
 }
 
 func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
-		filePath: filePath,
-		data:     make(map[string]URLData),
+		filePath:    filePath,
+		data:        make(map[string]URLData),
+		userURLs:    make(map[string][]string),
+		deletedURLs: make(map[string]bool),
 	}
 
 	// Проверяем существование файла, но не создаем его
@@ -34,7 +39,7 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	return fs, nil
 }
 
-func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) error {
+func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -44,23 +49,25 @@ func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL string) err
 	}
 
 	fs.data[shortID] = urlData
+	fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
 
 	return fs.saveToFile(ctx)
 }
 
-func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
+func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
 	urlData, exists := fs.data[shortID]
 	if !exists {
-		return "", false
+		return "", false, nil
 	}
 
-	return urlData.OriginalURL, true
+	isDeleted := fs.deletedURLs[shortID]
+	return urlData.OriginalURL, isDeleted, nil
 }
 
-func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string) error {
+func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
@@ -69,6 +76,7 @@ func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string)
 			ShortURL:    shortID,
 			OriginalURL: longURL,
 		}
+		fs.userURLs[userID] = append(fs.userURLs[userID], shortID)
 	}
 
 	return fs.saveToFile(ctx)
@@ -99,8 +107,15 @@ func (fs *FileStorage) saveToFile(ctx context.Context) error {
 		defer file.Close()
 
 		encoder := json.NewEncoder(file)
-		for _, urlData := range fs.data {
-			if err := encoder.Encode(urlData); err != nil {
+		for shortID, urlData := range fs.data {
+			data := struct {
+				URLData
+				IsDeleted bool `json:"is_deleted"`
+			}{
+				URLData:   urlData,
+				IsDeleted: fs.deletedURLs[shortID],
+			}
+			if err := encoder.Encode(data); err != nil {
 				return err
 			}
 		}
@@ -122,11 +137,17 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 
 		decoder := json.NewDecoder(file)
 		for decoder.More() {
-			var urlData URLData
-			if err := decoder.Decode(&urlData); err != nil {
+			var data struct {
+				URLData
+				IsDeleted bool `json:"is_deleted"`
+			}
+			if err := decoder.Decode(&data); err != nil {
 				return err
 			}
-			fs.data[urlData.ShortURL] = urlData
+			fs.data[data.ShortURL] = data.URLData
+			if data.IsDeleted {
+				fs.deletedURLs[data.ShortURL] = true
+			}
 		}
 
 		return nil
@@ -143,4 +164,33 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 		}
 	}
 	return "", nil
+}
+
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	shortIDs := fs.userURLs[userID]
+	urls := make([]URLData, 0, len(shortIDs))
+	for _, shortID := range shortIDs {
+		if urlData, exists := fs.data[shortID]; exists {
+			urls = append(urls, urlData)
+		}
+	}
+
+	return urls, nil
+}
+
+func (fs *FileStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	for _, shortID := range shortIDs {
+		// Проверяем, принадлежит ли URL данному пользователю
+		if slices.Contains(fs.userURLs[userID], shortID) {
+			fs.deletedURLs[shortID] = true
+		}
+	}
+
+	return fs.saveToFile(ctx)
 }
