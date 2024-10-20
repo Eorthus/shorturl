@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
@@ -42,6 +41,7 @@ func (s *DatabaseStorage) createTable(ctx context.Context) error {
 		short_id VARCHAR(10) UNIQUE NOT NULL,
 		user_id TEXT,
 		original_url TEXT NOT NULL,
+		is_deleted BOOLEAN DEFAULT FALSE,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
@@ -56,8 +56,6 @@ func (s *DatabaseStorage) Close() error {
 }
 
 func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, userID string) error {
-	log.Printf("Saving URL: shortID=%s, longURL=%s, userID=%s", shortID, longURL, userID)
-
 	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)", shortID, longURL, userID)
 	if err != nil {
 		pqErr, ok := err.(*pq.Error)
@@ -73,16 +71,20 @@ func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, 
 	return nil
 }
 
-func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
+func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
+
 	var longURL string
-	err := s.db.QueryRowContext(ctx, "SELECT original_url FROM urls WHERE short_id = $1", shortID).Scan(&longURL)
+	var isDeleted bool
+	err := s.db.QueryRowContext(ctx, "SELECT original_url, is_deleted FROM urls WHERE short_id = $1", shortID).Scan(&longURL, &isDeleted)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "", false
+			return "", false, nil
 		}
-		return "", false
+		return "", false, err
 	}
-	return longURL, true
+
+	return longURL, isDeleted, nil
 }
 
 func (s *DatabaseStorage) Ping(ctx context.Context) error {
@@ -125,7 +127,6 @@ func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL strin
 }
 
 func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
-	log.Printf("Fetching URLs for userID: %s", userID)
 	rows, err := s.db.QueryContext(ctx, "SELECT short_id, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user URLs: %w", err)
@@ -140,10 +141,27 @@ func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URL
 		}
 		urls = append(urls, url)
 	}
-	log.Printf("Found %d URLs for userID: %s", len(urls), userID)
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating URL rows: %w", err)
 	}
 
 	return urls, nil
+}
+
+func (s *DatabaseStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
+	result, err := s.db.ExecContext(ctx, `
+        UPDATE urls
+        SET is_deleted = TRUE
+        WHERE short_id = ANY($1) AND user_id = $2
+    `, pq.Array(shortIDs), userID)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	// Выводим количество обновленных строк
+	fmt.Printf("URLs marked as deleted: %d\n", rowsAffected)
+
+	return nil
 }

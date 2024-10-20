@@ -9,6 +9,7 @@ type MemoryStorage struct {
 	shortToLong map[string]string
 	longToShort map[string]string
 	userURLs    map[string][]string
+	deletedURLs map[string]bool
 	mutex       sync.RWMutex
 }
 
@@ -17,6 +18,7 @@ func NewMemoryStorage(ctx context.Context) (*MemoryStorage, error) {
 		shortToLong: make(map[string]string),
 		longToShort: make(map[string]string),
 		userURLs:    make(map[string][]string),
+		deletedURLs: make(map[string]bool),
 	}, nil
 }
 
@@ -47,12 +49,17 @@ func (ms *MemoryStorage) SaveURL(ctx context.Context, shortID, longURL, userID s
 	return nil
 }
 
-func (ms *MemoryStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
+func (ms *MemoryStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
 	longURL, exists := ms.shortToLong[shortID]
-	return longURL, exists
+	if !exists {
+		return "", false, nil
+	}
+
+	isDeleted := ms.deletedURLs[shortID]
+	return longURL, isDeleted, nil
 }
 
 func (ms *MemoryStorage) Ping(ctx context.Context) error {
@@ -96,4 +103,17 @@ func (ms *MemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]URLD
 	}
 
 	return urls, nil
+}
+
+func (ms *MemoryStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
+	ms.mutex.Lock()
+	defer ms.mutex.Unlock()
+
+	for _, shortID := range shortIDs {
+		if _, exists := ms.shortToLong[shortID]; exists {
+			ms.deletedURLs[shortID] = true
+		}
+	}
+
+	return nil
 }

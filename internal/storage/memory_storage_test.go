@@ -22,12 +22,15 @@ func TestMemoryStorage(t *testing.T) {
 		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
-		resultURL, exists := store.GetURL(ctx, shortID)
-		assert.True(t, exists)
+		resultURL, isDeleted, err := store.GetURL(ctx, shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted)
 		assert.Equal(t, longURL, resultURL)
 
-		_, exists = store.GetURL(ctx, "nonexistent")
-		assert.False(t, exists)
+		resultURL, isDeleted, err = store.GetURL(ctx, "nonexistent")
+		assert.NoError(t, err)
+		assert.False(t, isDeleted)
+		assert.Empty(t, resultURL)
 	})
 
 	t.Run("Ping", func(t *testing.T) {
@@ -46,8 +49,9 @@ func TestMemoryStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		for shortID, longURL := range urls {
-			resultURL, exists := store.GetURL(ctx, shortID)
-			assert.True(t, exists)
+			resultURL, isDeleted, err := store.GetURL(ctx, shortID)
+			assert.NoError(t, err)
+			assert.False(t, isDeleted)
 			assert.Equal(t, longURL, resultURL)
 		}
 	})
@@ -65,8 +69,9 @@ func TestMemoryStorage(t *testing.T) {
 				err := store.SaveURL(ctx, shortID, longURL, userID)
 				assert.NoError(t, err)
 
-				resultURL, exists := store.GetURL(ctx, shortID)
-				assert.True(t, exists)
+				resultURL, isDeleted, err := store.GetURL(ctx, shortID)
+				assert.NoError(t, err)
+				assert.False(t, isDeleted)
 				assert.Equal(t, longURL, resultURL)
 
 				done <- true
@@ -103,30 +108,25 @@ func TestMemoryStorage(t *testing.T) {
 		longURL2 := "https://example2.com"
 		userID := "user4"
 
-		// Сохраняем первый URL
 		err := store.SaveURL(context.Background(), shortID, longURL1, userID)
 		assert.NoError(t, err)
 
-		// Пытаемся сохранить второй URL с тем же shortID
 		err = store.SaveURL(context.Background(), shortID, longURL2, userID)
 		assert.Equal(t, ErrURLExists, err)
 
-		// Проверяем, что сохранен первый URL
-		resultURL, exists := store.GetURL(context.Background(), shortID)
-		assert.True(t, exists)
+		resultURL, isDeleted, err := store.GetURL(context.Background(), shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted)
 		assert.Equal(t, longURL1, resultURL)
 
-		// Проверяем, что можно получить shortID по первому longURL
 		resultShortID, err := store.GetShortIDByLongURL(context.Background(), longURL1)
 		assert.NoError(t, err)
 		assert.Equal(t, shortID, resultShortID)
 
-		// Проверяем, что нельзя получить shortID по второму longURL
 		resultShortID, err = store.GetShortIDByLongURL(context.Background(), longURL2)
 		assert.NoError(t, err)
 		assert.Empty(t, resultShortID)
 
-		// Пытаемся сохранить тот же URL еще раз
 		err = store.SaveURL(context.Background(), "another-short-id", longURL1, userID)
 		assert.Equal(t, ErrURLExists, err)
 	})
@@ -149,16 +149,47 @@ func TestMemoryStorage(t *testing.T) {
 
 		userURLs, err := store.GetUserURLs(context.Background(), userID)
 		assert.NoError(t, err)
-		assert.Len(t, userURLs, len(urls), "Количество URL пользователя должно совпадать")
+		assert.Len(t, userURLs, len(urls))
 
 		for i, u := range urls {
 			assert.Equal(t, u.shortID, userURLs[i].ShortURL)
 			assert.Equal(t, u.longURL, userURLs[i].OriginalURL)
 		}
 
-		// Проверка для несуществующего пользователя
 		nonExistentUserURLs, err := store.GetUserURLs(context.Background(), "nonexistent")
 		assert.NoError(t, err)
-		assert.Empty(t, nonExistentUserURLs, "Для несуществующего пользователя список URL должен быть пустым")
+		assert.Empty(t, nonExistentUserURLs)
+	})
+
+	t.Run("MarkURLsAsDeleted", func(t *testing.T) {
+		store, _ := NewMemoryStorage(context.Background())
+		userID := "user6"
+		urls := []struct {
+			shortID string
+			longURL string
+		}{
+			{"user6a", "https://user6a.com"},
+			{"user6b", "https://user6b.com"},
+		}
+
+		for _, u := range urls {
+			err := store.SaveURL(context.Background(), u.shortID, u.longURL, userID)
+			assert.NoError(t, err)
+		}
+
+		err := store.MarkURLsAsDeleted(context.Background(), []string{urls[0].shortID}, userID)
+		assert.NoError(t, err)
+
+		// Проверяем, что первый URL помечен как удаленный
+		resultURL, isDeleted, err := store.GetURL(context.Background(), urls[0].shortID)
+		assert.NoError(t, err)
+		assert.True(t, isDeleted)
+		assert.Equal(t, urls[0].longURL, resultURL)
+
+		// Проверяем, что второй URL не помечен как удаленный
+		resultURL, isDeleted, err = store.GetURL(context.Background(), urls[1].shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted)
+		assert.Equal(t, urls[1].longURL, resultURL)
 	})
 }

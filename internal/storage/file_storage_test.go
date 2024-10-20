@@ -30,13 +30,15 @@ func TestFileStorage(t *testing.T) {
 		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
 
-		resultURL, exists := store.GetURL(ctx, shortID)
-		assert.True(t, exists, "URL должен существовать")
+		resultURL, isDeleted, err := store.GetURL(ctx, shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted, "URL не должен быть помечен как удаленный")
 		assert.Equal(t, longURL, resultURL, "Полученный URL должен соответствовать сохраненному")
 
 		nonExistentShortID := "nonexistent"
-		resultURL, exists = store.GetURL(ctx, nonExistentShortID)
-		assert.False(t, exists, "URL не должен существовать")
+		resultURL, isDeleted, err = store.GetURL(ctx, nonExistentShortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted, "Несуществующий URL не должен быть помечен как удаленный")
 		assert.Equal(t, "", resultURL, "Для несуществующего shortID результат должен быть пустым")
 	})
 
@@ -50,8 +52,9 @@ func TestFileStorage(t *testing.T) {
 		newStore, err := NewFileStorage(ctx, tempFile)
 		require.NoError(t, err)
 
-		resultURL, exists := newStore.GetURL(ctx, shortID)
-		assert.True(t, exists, "URL должен существовать после перезагрузки")
+		resultURL, isDeleted, err := newStore.GetURL(ctx, shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted, "URL не должен быть помечен как удаленный")
 		assert.Equal(t, longURL, resultURL, "Загруженный URL должен соответствовать сохраненному")
 	})
 
@@ -61,26 +64,24 @@ func TestFileStorage(t *testing.T) {
 
 		lines := splitLines(content)
 		for _, line := range lines {
-			var urlData URLData
-			err := json.Unmarshal(line, &urlData)
+			var data struct {
+				URLData
+				IsDeleted bool `json:"is_deleted"`
+			}
+			err := json.Unmarshal(line, &data)
 			assert.NoError(t, err, "Каждая строка должна быть валидным JSON")
-			assert.NotEmpty(t, urlData.ShortURL, "ShortURL не должен быть пустым")
-			assert.NotEmpty(t, urlData.OriginalURL, "OriginalURL не должен быть пустым")
+			assert.NotEmpty(t, data.ShortURL, "ShortURL не должен быть пустым")
+			assert.NotEmpty(t, data.OriginalURL, "OriginalURL не должен быть пустым")
 		}
 	})
 
 	t.Run("Ping", func(t *testing.T) {
-		// Тест для существующего файла
-		err := store.SaveURL(ctx, "test", "https://example.com", "user3")
-		require.NoError(t, err)
-
-		err = store.Ping(ctx)
+		err := store.Ping(ctx)
 		assert.NoError(t, err, "Ping должен быть успешным для существующего файла")
 
-		// Тест для несуществующего файла
 		nonExistentFile := filepath.Join(tempDir, "non_existent.json")
 		storeNonExistent, err := NewFileStorage(ctx, nonExistentFile)
-		require.NoError(t, err, "Создание FileStorage для несуществующего файла не должно вызывать ошибку")
+		require.NoError(t, err)
 
 		err = storeNonExistent.Ping(ctx)
 		assert.Error(t, err, "Ping должен возвращать ошибку для несуществующего файла")
@@ -114,8 +115,9 @@ func TestFileStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		for shortID, longURL := range urls {
-			resultURL, exists := store.GetURL(ctx, shortID)
-			assert.True(t, exists, "URL должен существовать")
+			resultURL, isDeleted, err := store.GetURL(ctx, shortID)
+			assert.NoError(t, err)
+			assert.False(t, isDeleted, "URL не должен быть помечен как удаленный")
 			assert.Equal(t, longURL, resultURL, "Полученный URL должен соответствовать сохраненному")
 		}
 	})
@@ -144,10 +146,41 @@ func TestFileStorage(t *testing.T) {
 			assert.Equal(t, u.longURL, userURLs[i].OriginalURL)
 		}
 
-		// Проверка для несуществующего пользователя
 		nonExistentUserURLs, err := store.GetUserURLs(ctx, "nonexistent")
 		assert.NoError(t, err)
 		assert.Empty(t, nonExistentUserURLs, "Для несуществующего пользователя список URL должен быть пустым")
+	})
+
+	t.Run("MarkURLsAsDeleted", func(t *testing.T) {
+		userID := "user7"
+		urls := []struct {
+			shortID string
+			longURL string
+		}{
+			{"user7a", "https://user7a.com"},
+			{"user7b", "https://user7b.com"},
+		}
+
+		for _, u := range urls {
+			err := store.SaveURL(ctx, u.shortID, u.longURL, userID)
+			assert.NoError(t, err)
+		}
+
+		shortIDsToDelete := []string{urls[0].shortID}
+		err = store.MarkURLsAsDeleted(ctx, shortIDsToDelete, userID)
+		assert.NoError(t, err)
+
+		// Проверяем, что URL помечен как удаленный
+		resultURL, isDeleted, err := store.GetURL(ctx, urls[0].shortID)
+		assert.NoError(t, err)
+		assert.True(t, isDeleted, "URL должен быть помечен как удаленный")
+		assert.Equal(t, urls[0].longURL, resultURL)
+
+		// Проверяем, что другой URL не помечен как удаленный
+		resultURL, isDeleted, err = store.GetURL(ctx, urls[1].shortID)
+		assert.NoError(t, err)
+		assert.False(t, isDeleted, "URL не должен быть помечен как удаленный")
+		assert.Equal(t, urls[1].longURL, resultURL)
 	})
 }
 

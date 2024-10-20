@@ -31,6 +31,7 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
 		r.Get("/ping", handler.HandlePing)
 		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
 		r.Get("/api/user/urls", handler.HandleGetUserURLs) // Новый handler
+		r.Delete("/api/user/urls", handler.HandleDeleteURLs)
 	})
 
 	return r, store

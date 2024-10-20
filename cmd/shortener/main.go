@@ -62,6 +62,8 @@ func main() {
 		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
 	})
 
+	r.Delete("/api/user/urls", handler.HandleDeleteURLs)
+
 	// Логируем старт сервера
 	zapLogger.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),

@@ -11,6 +11,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
@@ -62,13 +63,30 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "shortID")
+	h.Logger.Info("Handling GET request", zap.String("shortID", shortID))
 
-	longURL, exists := h.Store.GetURL(r.Context(), shortID)
-	if !exists {
+	longURL, isDeleted, err := h.Store.GetURL(r.Context(), shortID)
+	if err != nil {
+		h.Logger.Error("Failed to get URL", zap.Error(err), zap.String("shortID", shortID))
+		apperrors.HandleHTTPError(w, err, h.Logger)
+		return
+	}
+
+	h.Logger.Info("URL retrieved", zap.String("shortID", shortID), zap.String("longURL", longURL), zap.Bool("isDeleted", isDeleted))
+
+	if longURL == "" {
+		h.Logger.Info("URL not found", zap.String("shortID", shortID))
 		apperrors.HandleHTTPError(w, apperrors.ErrNoSuchURL, h.Logger)
 		return
 	}
 
+	if isDeleted {
+		h.Logger.Info("Returning Gone status for deleted URL", zap.String("shortID", shortID))
+		w.WriteHeader(http.StatusGone)
+		return
+	}
+
+	h.Logger.Info("Redirecting to original URL", zap.String("shortID", shortID), zap.String("longURL", longURL))
 	http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
 }
 

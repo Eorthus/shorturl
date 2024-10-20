@@ -21,9 +21,9 @@ func (m *MockStorage) SaveURL(ctx context.Context, shortID, longURL, userID stri
 	return args.Error(0)
 }
 
-func (m *MockStorage) GetURL(ctx context.Context, shortID string) (string, bool) {
+func (m *MockStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	args := m.Called(ctx, shortID)
-	return args.String(0), args.Bool(1)
+	return args.String(0), args.Bool(1), args.Error(2)
 }
 
 func (m *MockStorage) Ping(ctx context.Context) error {
@@ -44,6 +44,11 @@ func (m *MockStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (
 func (m *MockStorage) GetUserURLs(ctx context.Context, userID string) ([]storage.URLData, error) {
 	args := m.Called(ctx, userID)
 	return args.Get(0).([]storage.URLData), args.Error(1)
+}
+
+func (m *MockStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
+	args := m.Called(ctx, shortIDs, userID)
+	return args.Error(0)
 }
 
 func TestDBContextMiddleware(t *testing.T) {
