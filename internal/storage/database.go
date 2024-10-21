@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
 type DatabaseStorage struct {
@@ -126,16 +128,16 @@ func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL strin
 	return shortID, nil
 }
 
-func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT short_id, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user URLs: %w", err)
 	}
 	defer rows.Close()
 
-	var urls []URLData
+	var urls []models.URLData
 	for rows.Next() {
-		var url URLData
+		var url models.URLData
 		if err := rows.Scan(&url.ShortURL, &url.OriginalURL); err != nil {
 			return nil, fmt.Errorf("failed to scan URL data: %w", err)
 		}

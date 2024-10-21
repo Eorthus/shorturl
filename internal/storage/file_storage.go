@@ -6,11 +6,13 @@ import (
 	"os"
 	"slices"
 	"sync"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
 type FileStorage struct {
 	filePath    string
-	data        map[string]URLData
+	data        map[string]models.URLData
 	userURLs    map[string][]string
 	deletedURLs map[string]bool
 	mutex       sync.RWMutex
@@ -19,7 +21,7 @@ type FileStorage struct {
 func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
 		filePath:    filePath,
-		data:        make(map[string]URLData),
+		data:        make(map[string]models.URLData),
 		userURLs:    make(map[string][]string),
 		deletedURLs: make(map[string]bool),
 	}
@@ -43,7 +45,7 @@ func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID str
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-	urlData := URLData{
+	urlData := models.URLData{
 		ShortURL:    shortID,
 		OriginalURL: longURL,
 	}
@@ -72,7 +74,7 @@ func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string,
 	defer fs.mutex.Unlock()
 
 	for shortID, longURL := range urls {
-		fs.data[shortID] = URLData{
+		fs.data[shortID] = models.URLData{
 			ShortURL:    shortID,
 			OriginalURL: longURL,
 		}
@@ -109,7 +111,7 @@ func (fs *FileStorage) saveToFile(ctx context.Context) error {
 		encoder := json.NewEncoder(file)
 		for shortID, urlData := range fs.data {
 			data := struct {
-				URLData
+				models.URLData
 				IsDeleted bool `json:"is_deleted"`
 			}{
 				URLData:   urlData,
@@ -138,7 +140,7 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 		decoder := json.NewDecoder(file)
 		for decoder.More() {
 			var data struct {
-				URLData
+				models.URLData
 				IsDeleted bool `json:"is_deleted"`
 			}
 			if err := decoder.Decode(&data); err != nil {
@@ -166,12 +168,12 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 	return "", nil
 }
 
-func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
 	shortIDs := fs.userURLs[userID]
-	urls := make([]URLData, 0, len(shortIDs))
+	urls := make([]models.URLData, 0, len(shortIDs))
 	for _, shortID := range shortIDs {
 		if urlData, exists := fs.data[shortID]; exists {
 			urls = append(urls, urlData)

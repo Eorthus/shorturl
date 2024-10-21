@@ -2,76 +2,47 @@ package main
 
 import (
 	"context"
-	"flag"
 	"log"
 	"net/http"
-	"time"
 
+	"github.com/Eorthus/shorturl/internal/api"
 	"github.com/Eorthus/shorturl/internal/config"
-	"github.com/Eorthus/shorturl/internal/handlers"
-	"github.com/Eorthus/shorturl/internal/logger"
-	"github.com/Eorthus/shorturl/internal/middleware"
+	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
-	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
 func main() {
 	// Инициализация логгера
-	zapLogger, _ := zap.NewProduction()
-	defer zapLogger.Sync()
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
 
-	// Парсинг конфигурации с обработкой ошибки
+	// Парсинг конфигурации
 	cfg, err := config.ParseConfig()
 	if err != nil {
-		zapLogger.Fatal("Failed to parse config", zap.Error(err))
+		logger.Fatal("Failed to parse config", zap.Error(err))
 	}
 
-	config.DefineFlags(cfg)
-	flag.Parse()              // Парсим флаги командной строки после их определения
-	config.ApplyPriority(cfg) // Применяем приоритет параметров
-
+	// Инициализация хранилища
 	ctx := context.Background()
 	store, err := storage.InitStorage(ctx, cfg)
 	if err != nil {
-		zapLogger.Fatal("Failed to initialize storage", zap.Error(err))
+		logger.Fatal("Failed to initialize storage", zap.Error(err))
 	}
 
-	handler := handlers.NewHandler(cfg.BaseURL, store, zapLogger)
+	// Инициализация сервиса
+	urlService := service.NewURLService(store)
 
-	r := chi.NewRouter()
+	// Инициализация роутера
+	router := api.NewRouter(cfg, urlService, logger, store)
 
-	r.Use(logger.Logger(zapLogger))
-	r.Use(middleware.GzipMiddleware)
-	r.Use(middleware.APIContextMiddleware(10 * time.Second))
-	r.Use(middleware.DBContextMiddleware(store))
-	r.Use(middleware.AuthMiddleware) // Добавляем middleware аутентификации
-
-	r.Group(func(r chi.Router) {
-		r.Use(logger.GETLogger(zapLogger))
-		r.Get("/{shortID}", handler.HandleGet)
-		r.Get("/ping", handler.HandlePing)
-		r.Get("/api/user/urls", handler.HandleGetUserURLs) // Новый handler
-	})
-
-	// Применяем логгер для всех POST запросов
-	r.Group(func(r chi.Router) {
-		r.Use(logger.POSTLogger(zapLogger))
-		r.Post("/", handler.HandlePost)
-		r.Post("/api/shorten", handler.HandleJSONPost)
-		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
-	})
-
-	r.Delete("/api/user/urls", handler.HandleDeleteURLs)
-
+	// Запуск HTTP-сервера
 	// Логируем старт сервера
-	zapLogger.Info("Starting server",
+	logger.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),
 		zap.String("base_url", cfg.BaseURL),
 		zap.String("file_storage_path", cfg.FileStoragePath),
 		zap.String("database_dsn", cfg.DatabaseDSN),
 	)
-
-	// Запуск HTTP-сервера
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, router))
 }

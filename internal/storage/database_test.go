@@ -8,6 +8,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
 func TestDatabaseStorage(t *testing.T) {
@@ -116,7 +118,7 @@ func TestDatabaseStorage(t *testing.T) {
 
 	t.Run("GetUserURLs", func(t *testing.T) {
 		userID := "user1"
-		expectedURLs := []URLData{
+		expectedURLs := []models.URLData{
 			{ShortURL: "abc123", OriginalURL: "https://example.com"},
 			{ShortURL: "def456", OriginalURL: "https://example.org"},
 		}

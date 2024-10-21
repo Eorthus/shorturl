@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"sync"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
 type MemoryStorage struct {
@@ -90,15 +92,15 @@ func (ms *MemoryStorage) GetShortIDByLongURL(ctx context.Context, longURL string
 	return shortID, nil
 }
 
-func (ms *MemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+func (ms *MemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
 	shortIDs := ms.userURLs[userID]
-	urls := make([]URLData, 0, len(shortIDs))
+	urls := make([]models.URLData, 0, len(shortIDs))
 	for _, shortID := range shortIDs {
 		if longURL, exists := ms.shortToLong[shortID]; exists {
-			urls = append(urls, URLData{ShortURL: shortID, OriginalURL: longURL})
+			urls = append(urls, models.URLData{ShortURL: shortID, OriginalURL: longURL})
 		}
 	}
 

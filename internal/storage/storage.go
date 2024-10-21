@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Eorthus/shorturl/internal/config"
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
 // Storage defines the interface for URL storage operations
@@ -13,14 +14,8 @@ type Storage interface {
 	Ping(ctx context.Context) error
 	SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error
 	GetShortIDByLongURL(ctx context.Context, longURL string) (string, error)
-	GetUserURLs(ctx context.Context, userID string) ([]URLData, error)
+	GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error)
 	MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error
-}
-
-// URLData represents the structure for storing URL data
-type URLData struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
 }
 
 func InitStorage(ctx context.Context, cfg *config.Config) (Storage, error) {
