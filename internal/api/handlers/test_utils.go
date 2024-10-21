@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Eorthus/shorturl/internal/config"
+	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,9 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
 
 	logger := zaptest.NewLogger(t)
 
-	handler := NewHandler(cfg.BaseURL, store, logger)
+	urlService := service.NewURLService(store)
+
+	handler := NewURLHandler(cfg, urlService, logger)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
