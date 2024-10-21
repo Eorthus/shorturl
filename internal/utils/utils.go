@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/Eorthus/shorturl/internal/storage"
 )
 
@@ -27,4 +29,12 @@ func CheckURLExists(ctx context.Context, store storage.Storage, longURL string) 
 	}
 
 	return "", http.StatusOK, nil
+}
+
+// IsValidURL проверяет, является ли строка допустимым URL
+func IsValidURL(url string) error {
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return apperrors.ErrInvalidURLFormat
+	}
+	return nil
 }

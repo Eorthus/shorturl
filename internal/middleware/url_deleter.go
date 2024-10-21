@@ -58,13 +58,24 @@ func (ud *URLDeleter) DeleteURLs(ctx context.Context, shortIDs []string, userID 
 	return nil
 }
 
+var batchPool = sync.Pool{
+	New: func() interface{} {
+		return make([]string, 0, 100) // Предполагаемый размер batch
+	},
+}
+
 func (ud *URLDeleter) generateBatches(shortIDs []string, batchSize int, batches chan<- []string) {
 	for i := 0; i < len(shortIDs); i += batchSize {
 		end := i + batchSize
 		if end > len(shortIDs) {
 			end = len(shortIDs)
 		}
-		batches <- shortIDs[i:end]
+
+		batch := batchPool.Get().([]string)
+		batch = batch[:0] // Сбрасываем длину слайса
+		batch = append(batch, shortIDs[i:end]...)
+
+		batches <- batch
 	}
 	close(batches)
 }
@@ -79,6 +90,7 @@ func (ud *URLDeleter) worker(ctx context.Context, userID string, batches <-chan 
 		default:
 			err := ud.store.MarkURLsAsDeleted(ctx, batch, userID)
 			results <- err
+			batchPool.Put(batch) // Возвращаем batch в пул
 		}
 	}
 }

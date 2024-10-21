@@ -34,7 +34,7 @@ func GetUserID(r *http.Request) string {
 		return ""
 	}
 	userID, signature := parts[0], parts[1]
-	if !validateSignature(userID, signature) {
+	if !isSignatureValid(userID, signature) {
 		return ""
 	}
 	return userID
@@ -58,7 +58,7 @@ func generateSignature(data string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func validateSignature(data, signature string) bool {
+func isSignatureValid(data, signature string) bool {
 	return generateSignature(data) == signature
 }
 

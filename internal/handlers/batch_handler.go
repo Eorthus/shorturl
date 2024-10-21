@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/Eorthus/shorturl/internal/middleware"
@@ -28,8 +27,8 @@ func (h *Handler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	responses := make([]BatchResponse, 0, len(requests))
 
 	for _, req := range requests {
-		if !strings.HasPrefix(req.OriginalURL, "http://") && !strings.HasPrefix(req.OriginalURL, "https://") {
-			apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+		if err := utils.IsValidURL(req.OriginalURL); err != nil {
+			apperrors.HandleHTTPError(w, err, h.Logger)
 			return
 		}
 

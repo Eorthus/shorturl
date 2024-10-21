@@ -27,8 +27,8 @@ func (h *Handler) HandlePost(w http.ResponseWriter, r *http.Request) {
 
 	longURL := strings.TrimSpace(string(body))
 
-	if !strings.HasPrefix(longURL, "http://") && !strings.HasPrefix(longURL, "https://") {
-		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+	if err := utils.IsValidURL(longURL); err != nil {
+		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
@@ -105,8 +105,8 @@ func (h *Handler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !strings.HasPrefix(request.URL, "http://") && !strings.HasPrefix(request.URL, "https://") {
-		apperrors.HandleHTTPError(w, apperrors.ErrInvalidURLFormat, h.Logger)
+	if err := utils.IsValidURL(request.URL); err != nil {
+		apperrors.HandleHTTPError(w, err, h.Logger)
 		return
 	}
 
