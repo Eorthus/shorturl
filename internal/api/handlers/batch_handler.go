@@ -19,8 +19,9 @@ func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) 
 	userID := middleware.GetUserID(r)
 
 	responses := make([]models.BatchResponse, 0, len(requests))
+	var err error
 
-	responses, err := h.urlService.SaveURLBatch(r.Context(), requests, userID)
+	responses, err = h.urlService.SaveURLBatch(r.Context(), requests, userID)
 	if err != nil {
 		apperrors.HandleHTTPError(w, err, h.logger)
 		return
