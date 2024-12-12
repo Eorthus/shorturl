@@ -7,6 +7,7 @@ import (
 
 	"github.com/Eorthus/shorturl/internal/api"
 	"github.com/Eorthus/shorturl/internal/config"
+	"github.com/Eorthus/shorturl/internal/profiler"
 	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
 	"go.uber.org/zap"
@@ -22,6 +23,10 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to parse config", zap.Error(err))
 	}
+
+	// Запускаем профилирование
+	cleanup := profiler.StartProfiling()
+	defer cleanup()
 
 	// Инициализация хранилища
 	ctx := context.Background()

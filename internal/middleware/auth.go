@@ -41,7 +41,7 @@ func GetUserID(r *http.Request) string {
 }
 
 func SetUserIDCookie(w http.ResponseWriter, userID string) {
-	signature := generateSignature(userID)
+	signature := GenerateSignature(userID)
 	value := userID + ":" + signature
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
@@ -52,14 +52,14 @@ func SetUserIDCookie(w http.ResponseWriter, userID string) {
 	})
 }
 
-func generateSignature(data string) string {
+func GenerateSignature(data string) string {
 	h := hmac.New(sha256.New, []byte(secretKey))
 	h.Write([]byte(data))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 func isSignatureValid(data, signature string) bool {
-	return generateSignature(data) == signature
+	return GenerateSignature(data) == signature
 }
 
 func split(s string, sep string) []string {

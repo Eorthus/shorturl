@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -56,6 +57,11 @@ func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
+
+	buf := BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer BufferPool.Put(buf)
+
 	var request struct {
 		URL string `json:"url"`
 	}

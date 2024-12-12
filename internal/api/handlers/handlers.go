@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"net/http"
+	"sync"
 
 	"github.com/Eorthus/shorturl/internal/config"
 	"github.com/Eorthus/shorturl/internal/service"
@@ -12,6 +14,12 @@ type URLHandler struct {
 	cfg        *config.Config
 	urlService *service.URLService
 	logger     *zap.Logger
+}
+
+var BufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
 }
 
 func NewURLHandler(cfg *config.Config, urlService *service.URLService, logger *zap.Logger) *URLHandler {

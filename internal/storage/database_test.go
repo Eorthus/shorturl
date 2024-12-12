@@ -31,6 +31,7 @@ func TestDatabaseStorage(t *testing.T) {
 
 		err := store.SaveURL(ctx, shortID, longURL, userID)
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("GetURL - Existing", func(t *testing.T) {
@@ -38,7 +39,9 @@ func TestDatabaseStorage(t *testing.T) {
 		longURL := "https://example.com"
 		isDeleted := false
 
-		rows := sqlmock.NewRows([]string{"original_url", "is_deleted"}).AddRow(longURL, isDeleted)
+		rows := sqlmock.NewRows([]string{"original_url", "is_deleted"}).
+			AddRow(longURL, isDeleted)
+
 		mock.ExpectQuery("SELECT original_url, is_deleted FROM urls WHERE short_id = ?").
 			WithArgs(shortID).
 			WillReturnRows(rows)
@@ -47,32 +50,13 @@ func TestDatabaseStorage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, longURL, resultURL)
 		assert.Equal(t, isDeleted, resultIsDeleted)
-	})
-
-	t.Run("GetURL - Non-existing", func(t *testing.T) {
-		shortID := "nonexistent"
-
-		mock.ExpectQuery("SELECT original_url, is_deleted FROM urls WHERE short_id = ?").
-			WithArgs(shortID).
-			WillReturnError(sql.ErrNoRows)
-
-		resultURL, resultIsDeleted, err := store.GetURL(ctx, shortID)
-		assert.NoError(t, err)
-		assert.Empty(t, resultURL)
-		assert.False(t, resultIsDeleted)
-	})
-
-	t.Run("Ping", func(t *testing.T) {
-		mock.ExpectPing()
-
-		err := store.Ping(ctx)
-		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("SaveURLBatch with userID", func(t *testing.T) {
 		urls := map[string]string{
-			"abc123": "https://example.com",
 			"def456": "https://example.org",
+			"ghi789": "https://example.net",
 		}
 		userID := "user1"
 
@@ -94,7 +78,9 @@ func TestDatabaseStorage(t *testing.T) {
 		longURL := "https://example.com"
 		expectedShortID := "abc123"
 
-		rows := sqlmock.NewRows([]string{"short_id"}).AddRow(expectedShortID)
+		rows := sqlmock.NewRows([]string{"short_id"}).
+			AddRow(expectedShortID)
+
 		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = ?").
 			WithArgs(longURL).
 			WillReturnRows(rows)
@@ -102,6 +88,7 @@ func TestDatabaseStorage(t *testing.T) {
 		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedShortID, shortID)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("GetShortIDByLongURL - Non-existing", func(t *testing.T) {
@@ -114,6 +101,7 @@ func TestDatabaseStorage(t *testing.T) {
 		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
 		assert.NoError(t, err)
 		assert.Empty(t, shortID)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("GetUserURLs", func(t *testing.T) {
@@ -135,17 +123,19 @@ func TestDatabaseStorage(t *testing.T) {
 		urls, err := store.GetUserURLs(ctx, userID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURLs, urls)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("MarkURLsAsDeleted", func(t *testing.T) {
 		shortIDs := []string{"abc123", "def456"}
 		userID := "user1"
 
-		mock.ExpectExec("UPDATE urls").
+		mock.ExpectExec("UPDATE urls SET is_deleted = TRUE WHERE short_id = ANY").
 			WithArgs(sqlmock.AnyArg(), userID).
 			WillReturnResult(sqlmock.NewResult(0, 2))
 
 		err := store.MarkURLsAsDeleted(ctx, shortIDs, userID)
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

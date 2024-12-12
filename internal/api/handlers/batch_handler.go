@@ -7,17 +7,18 @@ import (
 	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/Eorthus/shorturl/internal/models"
-	"go.uber.org/zap"
 )
 
 func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
-	var requests []models.BatchRequest
+	requests := make([]models.BatchRequest, 0, 100)
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidJSONFormat, h.logger)
 		return
 	}
 
 	userID := middleware.GetUserID(r)
+
+	responses := make([]models.BatchResponse, 0, len(requests))
 
 	responses, err := h.urlService.SaveURLBatch(r.Context(), requests, userID)
 	if err != nil {
@@ -42,7 +43,6 @@ func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) 
 
 func (h *URLHandler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
-	h.logger.Info("Handling request for userID", zap.String("userID", userID))
 
 	if userID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

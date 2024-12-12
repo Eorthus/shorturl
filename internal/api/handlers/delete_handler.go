@@ -11,7 +11,7 @@ import (
 )
 
 func (h *URLHandler) HandleDeleteURLs(w http.ResponseWriter, r *http.Request) {
-	var shortIDs []string
+	var shortIDs = make([]string, 0, 100)
 	if err := json.NewDecoder(r.Body).Decode(&shortIDs); err != nil {
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidJSONFormat, h.logger)
 		return

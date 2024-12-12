@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"os"
@@ -108,7 +109,10 @@ func (fs *FileStorage) saveToFile(ctx context.Context) error {
 		}
 		defer file.Close()
 
-		encoder := json.NewEncoder(file)
+		writer := bufio.NewWriter(file)
+		defer writer.Flush()
+
+		encoder := json.NewEncoder(writer)
 		for shortID, urlData := range fs.data {
 			data := struct {
 				models.URLData
