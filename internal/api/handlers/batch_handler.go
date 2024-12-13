@@ -55,17 +55,14 @@ func (h *URLHandler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Всегда возвращаем 200, даже если массив пуст
-	w.WriteHeader(http.StatusOK)
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
-	// Изменяем URLы для ответа
 	for i := range urls {
 		urls[i].ShortURL = h.cfg.BaseURL + "/" + urls[i].ShortURL
 	}
 
-	// Возвращаем пустой массив вместо 204
-	if err := json.NewEncoder(w).Encode(urls); err != nil {
-		apperrors.HandleHTTPError(w, err, h.logger)
-		return
-	}
+	json.NewEncoder(w).Encode(urls)
 }
