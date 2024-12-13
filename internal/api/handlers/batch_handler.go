@@ -9,6 +9,9 @@ import (
 	"github.com/Eorthus/shorturl/internal/models"
 )
 
+// HandleBatchShorten обрабатывает пакетные запросы на создание коротких URL.
+// Принимает массив BatchRequest в формате JSON.
+// Возвращает массив BatchResponse в формате JSON.
 func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) {
 	requests := make([]models.BatchRequest, 0, 100)
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
@@ -39,6 +42,9 @@ func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(responses)
 }
 
+// HandleGetUserURLs возвращает все URL, созданные пользователем.
+// Требует аутентификации пользователя.
+// Возвращает массив URLData в формате JSON.
 func (h *URLHandler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 

@@ -1,3 +1,4 @@
+// Package apperrors предоставляет типы ошибок и их обработчики для сервиса.
 package apperrors
 
 import (
@@ -7,11 +8,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// AppError представляет ошибку приложения с HTTP статусом.
 type AppError struct {
-	Status  int
-	Message string
+	Status  int    // HTTP статус-код
+	Message string // Сообщение об ошибке
 }
 
+// HandleHTTPError обрабатывает ошибку и записывает соответствующий HTTP-ответ.
 func (e AppError) Error() string {
 	return e.Message
 }

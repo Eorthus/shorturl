@@ -10,6 +10,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// HandleDeleteURLs обрабатывает запросы на удаление URL пользователя.
+// Принимает массив коротких идентификаторов в формате JSON.
+// Асинхронно помечает URL как удаленные.
 func (h *URLHandler) HandleDeleteURLs(w http.ResponseWriter, r *http.Request) {
 	var shortIDs = make([]string, 0, 100)
 	if err := json.NewDecoder(r.Body).Decode(&shortIDs); err != nil {

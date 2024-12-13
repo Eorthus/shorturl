@@ -13,6 +13,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// HandlePost обрабатывает POST-запросы для создания коротких URL.
+// URL передается в теле запроса в текстовом формате.
+// Возвращает короткий URL в текстовом формате.
 func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
@@ -44,6 +47,9 @@ func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(h.cfg.BaseURL + "/" + shortID))
 }
 
+// HandleGet обрабатывает GET-запросы для получения оригинального URL.
+// Короткий идентификатор передается в URL запроса.
+// Выполняет перенаправление на оригинальный URL.
 func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "shortID")
 
@@ -61,6 +67,9 @@ func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
 }
 
+// HandleJSONPost обрабатывает POST-запросы для создания коротких URL в формате JSON.
+// Принимает JSON с полем "url".
+// Возвращает JSON с полем "result", содержащим короткий URL.
 func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	buf := BufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
