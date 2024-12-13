@@ -42,7 +42,7 @@ func TestDatabaseStorage(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"original_url", "is_deleted"}).
 			AddRow(longURL, isDeleted)
 
-		mock.ExpectQuery("SELECT original_url, is_deleted FROM urls WHERE short_id = ?").
+		mock.ExpectQuery("SELECT original_url, is_deleted FROM urls WHERE short_id = \\$1").
 			WithArgs(shortID).
 			WillReturnRows(rows)
 
@@ -62,6 +62,7 @@ func TestDatabaseStorage(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectPrepare("INSERT INTO urls")
+
 		for shortID, longURL := range urls {
 			mock.ExpectExec("INSERT INTO urls").
 				WithArgs(shortID, longURL, userID).
@@ -78,12 +79,9 @@ func TestDatabaseStorage(t *testing.T) {
 		longURL := "https://example.com"
 		expectedShortID := "abc123"
 
-		rows := sqlmock.NewRows([]string{"short_id"}).
-			AddRow(expectedShortID)
-
-		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = ?").
+		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = \\$1").
 			WithArgs(longURL).
-			WillReturnRows(rows)
+			WillReturnRows(sqlmock.NewRows([]string{"short_id"}).AddRow(expectedShortID))
 
 		shortID, err := store.GetShortIDByLongURL(ctx, longURL)
 		assert.NoError(t, err)
@@ -94,7 +92,7 @@ func TestDatabaseStorage(t *testing.T) {
 	t.Run("GetShortIDByLongURL - Non-existing", func(t *testing.T) {
 		longURL := "https://nonexistent.com"
 
-		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = ?").
+		mock.ExpectQuery("SELECT short_id FROM urls WHERE original_url = \\$1").
 			WithArgs(longURL).
 			WillReturnError(sql.ErrNoRows)
 
@@ -116,7 +114,7 @@ func TestDatabaseStorage(t *testing.T) {
 			rows.AddRow(url.ShortURL, url.OriginalURL)
 		}
 
-		mock.ExpectQuery("SELECT short_id, original_url FROM urls WHERE user_id = ?").
+		mock.ExpectQuery("SELECT short_id, original_url FROM urls WHERE user_id = \\$1").
 			WithArgs(userID).
 			WillReturnRows(rows)
 
@@ -130,7 +128,7 @@ func TestDatabaseStorage(t *testing.T) {
 		shortIDs := []string{"abc123", "def456"}
 		userID := "user1"
 
-		mock.ExpectExec("UPDATE urls SET is_deleted = TRUE WHERE short_id = ANY").
+		mock.ExpectExec("UPDATE urls SET is_deleted = TRUE WHERE short_id = ANY\\(\\$1\\) AND user_id = \\$2").
 			WithArgs(sqlmock.AnyArg(), userID).
 			WillReturnResult(sqlmock.NewResult(0, 2))
 
