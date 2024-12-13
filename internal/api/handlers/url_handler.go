@@ -10,6 +10,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/Eorthus/shorturl/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +23,10 @@ func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 
 	longURL := strings.TrimSpace(string(body))
 	userID := middleware.GetUserID(r)
+	if userID == "" {
+		userID = uuid.New().String()
+		middleware.SetUserIDCookie(w, userID)
+	}
 
 	shortID, err := h.urlService.ShortenURL(r.Context(), longURL, userID)
 	if err != nil {
@@ -57,10 +62,15 @@ func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
-
 	buf := BufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer BufferPool.Put(buf)
+
+	userID := middleware.GetUserID(r)
+	if userID == "" {
+		userID = uuid.New().String()
+		middleware.SetUserIDCookie(w, userID)
+	}
 
 	var request struct {
 		URL string `json:"url"`
@@ -71,7 +81,11 @@ func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if request.URL == "" {
+		apperrors.HandleHTTPError(w, apperrors.ErrEmptyURL, h.logger)
+		return
+	}
+
 	shortID, err := h.urlService.ShortenURL(r.Context(), request.URL, userID)
 	if err != nil {
 		if err == apperrors.ErrURLExists {
