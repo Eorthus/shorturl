@@ -14,6 +14,7 @@ const (
 	secretKey  = "your-secret-key" // В реальном приложении следует использовать более безопасный метод хранения ключа
 )
 
+// AuthMiddleware проверяет аутентификацию пользователя
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := GetUserID(r)
@@ -24,6 +25,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// GetUserID извлекает ID пользователя из cookie
 func GetUserID(r *http.Request) string {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {
@@ -41,6 +44,7 @@ func GetUserID(r *http.Request) string {
 	return userID
 }
 
+// SetUserIDCookie устанавливает cookie с ID пользователя
 func SetUserIDCookie(w http.ResponseWriter, userID string) {
 	signature := GenerateSignature(userID)
 	value := userID + ":" + signature
@@ -53,12 +57,14 @@ func SetUserIDCookie(w http.ResponseWriter, userID string) {
 	})
 }
 
+// GenerateSignature генерирует подпись для cookie
 func GenerateSignature(data string) string {
 	h := hmac.New(sha256.New, []byte(secretKey))
 	h.Write([]byte(data))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// isSignatureValid проверяет валидна ли подпись
 func isSignatureValid(data, signature string) bool {
 	return GenerateSignature(data) == signature
 }

@@ -53,6 +53,7 @@ type Storage interface {
 	MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error
 }
 
+// InitStorage инициализирует хранилище в зависимости от конфигурации
 func InitStorage(ctx context.Context, cfg *config.Config) (Storage, error) {
 	if cfg.DatabaseDSN != "" {
 		return NewDatabaseStorage(ctx, cfg.DatabaseDSN)

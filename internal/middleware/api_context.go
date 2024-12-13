@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// APIContextMiddleware добавляет тайм-аут в контекст запроса
 func APIContextMiddleware(timeout time.Duration) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

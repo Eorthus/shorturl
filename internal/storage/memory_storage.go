@@ -7,6 +7,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/models"
 )
 
+// MemoryStorage реализует хранение URL в памяти
 type MemoryStorage struct {
 	shortToLong map[string]string
 	longToShort map[string]string
@@ -15,6 +16,7 @@ type MemoryStorage struct {
 	mutex       sync.RWMutex
 }
 
+// NewMemoryStorage создает новое хранилище в памяти
 func NewMemoryStorage(ctx context.Context) (*MemoryStorage, error) {
 	return &MemoryStorage{
 		shortToLong: make(map[string]string),
@@ -24,10 +26,12 @@ func NewMemoryStorage(ctx context.Context) (*MemoryStorage, error) {
 	}, nil
 }
 
+// Close освобождает ресурсы хранилища в памяти
 func (ms *MemoryStorage) Close() error {
 	return nil // No need to close memory storage
 }
 
+// SaveURL сохраняет URL в хранилище в памяти
 func (ms *MemoryStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
@@ -51,6 +55,7 @@ func (ms *MemoryStorage) SaveURL(ctx context.Context, shortID, longURL, userID s
 	return nil
 }
 
+// GetURL возвращает оригинальный URL по короткому идентификатору
 func (ms *MemoryStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
@@ -64,10 +69,12 @@ func (ms *MemoryStorage) GetURL(ctx context.Context, shortID string) (string, bo
 	return longURL, isDeleted, nil
 }
 
+// Ping пингует db
 func (ms *MemoryStorage) Ping(ctx context.Context) error {
 	return nil // Memory storage is always available
 }
 
+// SaveURLBatch сохраняем массив URL
 func (ms *MemoryStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
@@ -81,6 +88,7 @@ func (ms *MemoryStorage) SaveURLBatch(ctx context.Context, urls map[string]strin
 	return nil
 }
 
+// GetShortIDByLongURL вытягивает short_id URL по идентификатору
 func (ms *MemoryStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
@@ -92,6 +100,7 @@ func (ms *MemoryStorage) GetShortIDByLongURL(ctx context.Context, longURL string
 	return shortID, nil
 }
 
+// GetUserURLs отдает массив URL пользователя
 func (ms *MemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
@@ -107,6 +116,7 @@ func (ms *MemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]mode
 	return urls, nil
 }
 
+// MarkURLsAsDeleted помечает запись как удаленную
 func (ms *MemoryStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()

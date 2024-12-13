@@ -19,14 +19,21 @@ func (e AppError) Error() string {
 	return e.Message
 }
 
+// Предопределенные ошибки приложения
 var (
-	ErrURLExists         = AppError{Status: http.StatusConflict, Message: "URL already exists"}
-	ErrNoSuchURL         = AppError{Status: http.StatusNotFound, Message: "Short URL not found"}
-	ErrInvalidURLFormat  = AppError{Status: http.StatusBadRequest, Message: "Invalid URL format"}
+	// ErrURLExists возникает при попытке сохранить уже существующий URL
+	ErrURLExists = AppError{Status: http.StatusConflict, Message: "URL already exists"}
+	// ErrNoSuchURL возникает при попытке получить несуществующий URL
+	ErrNoSuchURL = AppError{Status: http.StatusNotFound, Message: "Short URL not found"}
+	// ErrInvalidURLFormat возникает при некорректном формате URL
+	ErrInvalidURLFormat = AppError{Status: http.StatusBadRequest, Message: "Invalid URL format"}
+	// ErrInvalidJSONFormat возникает при некорректном формате JSON
 	ErrInvalidJSONFormat = AppError{Status: http.StatusBadRequest, Message: "Invalid JSON format"}
-	ErrEmptyURL          = AppError{Status: http.StatusBadRequest, Message: "Empty URL"}
+	// ErrEmptyURL возникает при попытке сохранить пустой URL
+	ErrEmptyURL = AppError{Status: http.StatusBadRequest, Message: "Empty URL"}
 )
 
+// HandleHTTPError обрабатывает ошибку и отправляет соответствующий HTTP-ответ
 func HandleHTTPError(w http.ResponseWriter, err error, logger *zap.Logger) {
 	if err == nil {
 		return

@@ -11,6 +11,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/models"
 )
 
+// FileStorage реализует файловое хранение URL
 type FileStorage struct {
 	filePath    string
 	data        map[string]models.URLData
@@ -19,6 +20,7 @@ type FileStorage struct {
 	mutex       sync.RWMutex
 }
 
+// NewFileStorage создает новое файловое хранилище
 func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
 		filePath:    filePath,
@@ -42,6 +44,7 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	return fs, nil
 }
 
+// SaveURL сохраняет URL в файловое хранилище
 func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
@@ -57,6 +60,7 @@ func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID str
 	return fs.saveToFile(ctx)
 }
 
+// GetURL возвращает URL из файлового хранилища
 func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
@@ -70,6 +74,7 @@ func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool
 	return urlData.OriginalURL, isDeleted, nil
 }
 
+// SaveURLBatch сохраняем массив URL
 func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
@@ -85,6 +90,7 @@ func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string,
 	return fs.saveToFile(ctx)
 }
 
+// Ping пингует db
 func (fs *FileStorage) Ping(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -160,6 +166,7 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 	}
 }
 
+// GetShortIDByLongURL вытягивает short_id URL по идентификатору
 func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
@@ -172,6 +179,7 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 	return "", nil
 }
 
+// GetUserURLs отдает массив URL пользователя
 func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
@@ -187,6 +195,7 @@ func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]models
 	return urls, nil
 }
 
+// MarkURLsAsDeleted помечает запись как удаленную
 func (fs *FileStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()

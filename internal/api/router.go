@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewRouter создает и настраивает маршрутизатор HTTP запросов
 func NewRouter(cfg *config.Config, urlService *service.URLService, logger *zap.Logger, store storage.Storage) chi.Router {
 	r := chi.NewRouter()
 

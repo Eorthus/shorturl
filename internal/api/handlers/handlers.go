@@ -54,12 +54,14 @@ func NewURLHandler(cfg *config.Config, urlService *service.URLService, logger *z
 	}
 }
 
+// BufferPool представляет пул буферов для оптимизации памяти
 var BufferPool = sync.Pool{
 	New: func() interface{} {
 		return new(bytes.Buffer)
 	},
 }
 
+// HandlePing пингует storage
 func (h *URLHandler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	if err := h.urlService.Ping(r.Context()); err != nil {
 		h.logger.Error("Failed to ping storage", zap.Error(err))

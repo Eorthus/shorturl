@@ -8,11 +8,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// URLDeleter управляет асинхронным удалением URL
 type URLDeleter struct {
 	store  storage.Storage
 	logger *zap.Logger
 }
 
+// NewURLDeleter создает новый экземпляр URLDeleter
 func NewURLDeleter(store storage.Storage, logger *zap.Logger) *URLDeleter {
 	return &URLDeleter{
 		store:  store,
@@ -20,6 +22,7 @@ func NewURLDeleter(store storage.Storage, logger *zap.Logger) *URLDeleter {
 	}
 }
 
+// DeleteURLs асинхронно удаляет указанные URL
 func (ud *URLDeleter) DeleteURLs(ctx context.Context, shortIDs []string, userID string) error {
 	ud.logger.Info("Starting URL deletion", zap.Strings("shortIDs", shortIDs), zap.String("userID", userID))
 
