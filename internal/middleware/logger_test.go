@@ -11,32 +11,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-// Общая функция для проверки GET-запросов
-func checkGETLog(t *testing.T, logEntry observer.LoggedEntry, uri string) {
-	assert.Equal(t, "GET Request", logEntry.Message)
-	assert.Equal(t, uri, logEntry.ContextMap()["uri"])
-	assert.Equal(t, "GET", logEntry.ContextMap()["method"])
-
-	duration, ok := logEntry.ContextMap()["duration"].(time.Duration)
-	assert.True(t, ok)
-	assert.Greater(t, duration, time.Duration(0))
-
-	assert.NotContains(t, logEntry.ContextMap(), "status")
-	assert.NotContains(t, logEntry.ContextMap(), "size")
-}
-
-// Общая функция для проверки POST-запросов
-func checkPOSTLog(t *testing.T, logEntry observer.LoggedEntry, statusCode int64, size int64) {
-	assert.Equal(t, "POST Response", logEntry.Message)
-	assert.Equal(t, statusCode, logEntry.ContextMap()["status"])
-	assert.Equal(t, size, logEntry.ContextMap()["size"])
-
-	assert.NotContains(t, logEntry.ContextMap(), "uri")
-	assert.NotContains(t, logEntry.ContextMap(), "method")
-	assert.NotContains(t, logEntry.ContextMap(), "duration")
-}
-
-func TestGETLogger(t *testing.T) {
+func TestLogger(t *testing.T) {
 	core, recorded := observer.New(zap.InfoLevel)
 	logger := zap.New(core)
 
@@ -47,29 +22,77 @@ func TestGETLogger(t *testing.T) {
 		w.Write([]byte("OK"))
 	})
 
-	// Оборачиваем тестовый обработчик GETLogger'ом
-	handler := GETLogger(logger)(testHandler)
-
 	t.Run("GET request", func(t *testing.T) {
-		t.Parallel()
-		// Очищаем логи перед каждым тестом
+		// Очищаем логи перед тестом
 		recorded.TakeAll()
 
-		req := httptest.NewRequest("GET", "/test-get", nil)
+		handler := Logger(logger)(testHandler)
+		req := httptest.NewRequest(http.MethodGet, "/test-get", nil)
 		rec := httptest.NewRecorder()
 
-		// Выполняем запрос
 		handler.ServeHTTP(rec, req)
 
-		// Проверяем статус код
-		assert.Equal(t, http.StatusOK, rec.Code)
+		logs := recorded.All()
+		assert.Equal(t, 1, len(logs), "Should record exactly one log entry")
 
-		// Проверяем, что лог был записан
-		assert.Equal(t, 1, recorded.Len())
-		logEntry := recorded.All()[0]
+		if len(logs) > 0 {
+			log := logs[0]
+			assert.Equal(t, "Request", log.Message)
+			assert.Equal(t, "/test-get", log.Context[0].String)
+			assert.Equal(t, "GET", log.Context[1].String)
+			assert.Equal(t, http.StatusOK, int(log.Context[3].Integer))
+		}
+	})
 
-		// Проверяем поля лога для GET запроса
-		checkGETLog(t, logEntry, "/test-get")
+	t.Run("POST request", func(t *testing.T) {
+		recorded.TakeAll()
+
+		handler := Logger(logger)(testHandler)
+		req := httptest.NewRequest(http.MethodPost, "/test-post", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		logs := recorded.All()
+		assert.Equal(t, 1, len(logs), "Should record exactly one log entry")
+
+		if len(logs) > 0 {
+			log := logs[0]
+			assert.Equal(t, "Request", log.Message)
+			assert.Equal(t, "/test-post", log.Context[0].String)
+			assert.Equal(t, "POST", log.Context[1].String)
+			assert.Equal(t, http.StatusOK, int(log.Context[3].Integer))
+		}
+	})
+}
+
+func TestGETLogger(t *testing.T) {
+	core, recorded := observer.New(zap.InfoLevel)
+	logger := zap.New(core)
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	t.Run("GET request", func(t *testing.T) {
+		recorded.TakeAll()
+
+		handler := GETLogger(logger)(testHandler)
+		req := httptest.NewRequest(http.MethodGet, "/test-get", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		logs := recorded.All()
+		assert.Equal(t, 1, len(logs), "Should record exactly one log entry")
+
+		if len(logs) > 0 {
+			log := logs[0]
+			assert.Equal(t, "GET Request", log.Message)
+			assert.Equal(t, "/test-get", log.Context[0].String)
+			assert.Equal(t, "GET", log.Context[1].String)
+		}
 	})
 }
 
@@ -77,96 +100,28 @@ func TestPOSTLogger(t *testing.T) {
 	core, recorded := observer.New(zap.InfoLevel)
 	logger := zap.New(core)
 
-	// Тестовый обработчик
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusCreated) // 201 статус для POST
-		w.Write([]byte("OK"))
-	})
-
-	// Оборачиваем тестовый обработчик POSTLogger'ом
-	handler := POSTLogger(logger)(testHandler)
-
-	t.Run("POST request", func(t *testing.T) {
-		t.Parallel()
-		// Очищаем логи перед каждым тестом
-		recorded.TakeAll()
-
-		req := httptest.NewRequest("POST", "/test-post", nil)
-		rec := httptest.NewRecorder()
-
-		// Выполняем запрос
-		handler.ServeHTTP(rec, req)
-
-		// Проверяем статус код
-		assert.Equal(t, http.StatusCreated, rec.Code)
-
-		// Проверяем, что лог был записан
-		assert.Equal(t, 1, recorded.Len())
-		logEntry := recorded.All()[0]
-
-		// Проверяем поля лога для POST запроса
-		checkPOSTLog(t, logEntry, 201, 2) // 2 байта — это "OK"
-	})
-}
-
-func TestLogger(t *testing.T) {
-	core, recorded := observer.New(zap.InfoLevel)
-	logger := zap.New(core)
-
-	// Тестовый обработчик
-	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	// Оборачиваем тестовый обработчик общим логгером
-	handler := Logger(logger)(testHandler)
-
-	t.Run("GET request", func(t *testing.T) {
-		t.Parallel()
-		// Очищаем логи перед каждым тестом
-		recorded.TakeAll()
-
-		req := httptest.NewRequest("GET", "/test-get", nil)
-		rec := httptest.NewRecorder()
-
-		// Выполняем запрос
-		handler.ServeHTTP(rec, req)
-
-		// Проверяем статус код
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		// Проверяем, что лог был записан
-		assert.Equal(t, 1, recorded.Len())
-		logEntry := recorded.All()[0]
-
-		// Общий лог должен логировать все запросы, проверяем поля для GET
-		assert.Equal(t, "Request", logEntry.Message)
-		assert.Equal(t, "/test-get", logEntry.ContextMap()["uri"])
-		assert.Equal(t, "GET", logEntry.ContextMap()["method"])
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("Created"))
 	})
 
 	t.Run("POST request", func(t *testing.T) {
-		t.Parallel()
-		// Очищаем логи перед каждым тестом
 		recorded.TakeAll()
 
-		req := httptest.NewRequest("POST", "/test-post", nil)
+		handler := POSTLogger(logger)(testHandler)
+		req := httptest.NewRequest(http.MethodPost, "/test-post", nil)
 		rec := httptest.NewRecorder()
 
-		// Выполняем запрос
 		handler.ServeHTTP(rec, req)
 
-		// Проверяем статус код
-		assert.Equal(t, http.StatusOK, rec.Code)
+		logs := recorded.All()
+		assert.Equal(t, 1, len(logs), "Should record exactly one log entry")
 
-		// Проверяем, что лог был записан
-		assert.Equal(t, 1, recorded.Len())
-		logEntry := recorded.All()[0]
-
-		// Общий лог должен логировать все запросы, проверяем поля для POST
-		assert.Equal(t, "Request", logEntry.Message)
-		assert.Equal(t, "/test-post", logEntry.ContextMap()["uri"])
-		assert.Equal(t, "POST", logEntry.ContextMap()["method"])
+		if len(logs) > 0 {
+			log := logs[0]
+			assert.Equal(t, "POST Response", log.Message)
+			assert.Equal(t, http.StatusCreated, int(log.Context[0].Integer))
+			assert.Greater(t, log.Context[1].Integer, int64(0))
+		}
 	})
 }

@@ -8,16 +8,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// Logger для универсальных запросов (не привязан к методу)
+// Logger для универсальных запросов
 func Logger(logger *zap.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now().UTC()
+			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
+			// Выполняем запрос
 			next.ServeHTTP(ww, r)
 
-			// Общие логи
+			// Логируем все запросы
 			logger.Info("Request",
 				zap.String("uri", r.RequestURI),
 				zap.String("method", r.Method),
@@ -33,11 +34,12 @@ func Logger(logger *zap.Logger) func(next http.Handler) http.Handler {
 func GETLogger(logger *zap.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now().UTC()
 			if r.Method == http.MethodGet {
-				next.ServeHTTP(w, r)
+				start := time.Now()
+				ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-				// Логирование только для GET
+				next.ServeHTTP(ww, r)
+
 				logger.Info("GET Request",
 					zap.String("uri", r.RequestURI),
 					zap.String("method", r.Method),
@@ -54,18 +56,17 @@ func GETLogger(logger *zap.Logger) func(next http.Handler) http.Handler {
 func POSTLogger(logger *zap.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
 			if r.Method == http.MethodPost {
+				ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
 				next.ServeHTTP(ww, r)
 
-				// Логирование только для POST
 				logger.Info("POST Response",
 					zap.Int("status", ww.Status()),
 					zap.Int("size", ww.BytesWritten()),
 				)
 			} else {
-				next.ServeHTTP(ww, r)
+				next.ServeHTTP(w, r)
 			}
 		})
 	}
