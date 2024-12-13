@@ -3,7 +3,6 @@ package profiler
 import (
 	"flag"
 	"log"
-	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -22,11 +21,6 @@ func StartProfiling() func() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Запускаем HTTP сервер для профилирования
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 
 	// Запускаем сборку мусора перед получением профиля памяти
 	runtime.GC()
