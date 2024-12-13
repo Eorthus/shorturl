@@ -1,8 +1,10 @@
-package profiler
+package main
 
 import (
 	"flag"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -10,7 +12,9 @@ import (
 
 var profileFile = flag.String("profile", "base.pprof", "Name of the profile output file")
 
-func StartProfiling() func() {
+func main() {
+	flag.Parse()
+
 	// Создаем директорию для профилей если её нет
 	if err := os.MkdirAll("profiles", 0755); err != nil {
 		log.Fatal(err)
@@ -21,6 +25,12 @@ func StartProfiling() func() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
+
+	// Запускаем HTTP сервер для профилирования
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// Запускаем сборку мусора перед получением профиля памяти
 	runtime.GC()
@@ -30,8 +40,5 @@ func StartProfiling() func() {
 		log.Fatal(err)
 	}
 
-	// Возвращаем функцию cleanup
-	return func() {
-		f.Close()
-	}
+	log.Printf("Profile saved to profiles/%s\n", *profileFile)
 }
