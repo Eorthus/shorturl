@@ -30,3 +30,7 @@ git fetch template && git checkout template/main .github
 При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
 
 Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
+
+## Форматирование goimports на windows
+
+Get-ChildItem -Path . -Filter *.go -Recurse | ForEach-Object { goimports -w $_.FullName }
