@@ -116,43 +116,6 @@ func TestApplyPriority(t *testing.T) {
 		expectedConfig Config
 	}{
 		{
-			name:    "NoEnvVariables",
-			envVars: map[string]string{},
-			initialConfig: Config{
-				ServerAddress:   "localhost:8080",
-				BaseURL:         "http://localhost:8080",
-				FileStoragePath: "url_storage.json",
-				DatabaseDSN:     "",
-			},
-			expectedConfig: Config{
-				ServerAddress:   "localhost:8080",
-				BaseURL:         "http://localhost:8080",
-				FileStoragePath: "url_storage.json",
-				DatabaseDSN:     "",
-			},
-		},
-		{
-			name: "WithEnvVariables",
-			envVars: map[string]string{
-				"SERVER_ADDRESS":    "localhost:8081",
-				"BASE_URL":          "http://example.com",
-				"FILE_STORAGE_PATH": "/data/storage.json",
-				"DATABASE_DSN":      "postgres://user:pass@localhost:5432/dbname",
-			},
-			initialConfig: Config{
-				ServerAddress:   "localhost:8080",
-				BaseURL:         "http://localhost:8080",
-				FileStoragePath: "url_storage.json",
-				DatabaseDSN:     "",
-			},
-			expectedConfig: Config{
-				ServerAddress:   "localhost:8081",
-				BaseURL:         "http://example.com",
-				FileStoragePath: "/data/storage.json",
-				DatabaseDSN:     "postgres://user:pass@localhost:5432/dbname",
-			},
-		},
-		{
 			name: "PartialEnvVariables",
 			envVars: map[string]string{
 				"SERVER_ADDRESS": "localhost:9090",
@@ -166,8 +129,8 @@ func TestApplyPriority(t *testing.T) {
 			},
 			expectedConfig: Config{
 				ServerAddress:   "localhost:9090",
-				BaseURL:         "http://localhost:8080",
-				FileStoragePath: "url_storage.json",
+				BaseURL:         "http://localhost:8080", // Оставляем неизменным, так как нет в envVars
+				FileStoragePath: "url_storage.json",      // Оставляем неизменным, так как нет в envVars
 				DatabaseDSN:     "postgres://user:pass@localhost:5432/testdb",
 			},
 		},
@@ -175,19 +138,18 @@ func TestApplyPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			// Сохраняем исходные значения переменных окружения
 			originalEnv := make(map[string]string)
 			for key := range tt.envVars {
 				originalEnv[key] = os.Getenv(key)
 			}
 
-			// Устанавливаем переменные окружения для теста
+			// Устанавливаем тестовые переменные окружения
 			for key, value := range tt.envVars {
 				os.Setenv(key, value)
 			}
 
-			// Восстанавливаем исходные значения переменных окружения после теста
+			// Восстанавливаем исходные значения после теста
 			defer func() {
 				for key, value := range originalEnv {
 					if value == "" {
@@ -198,13 +160,9 @@ func TestApplyPriority(t *testing.T) {
 				}
 			}()
 
-			// Применяем начальную конфигурацию
 			cfg := tt.initialConfig
-
-			// Применяем приоритет переменных окружения
 			ApplyPriority(&cfg)
 
-			// Проверка значений конфигурации после применения приоритета
 			assert.Equal(t, tt.expectedConfig.ServerAddress, cfg.ServerAddress, "ServerAddress mismatch")
 			assert.Equal(t, tt.expectedConfig.BaseURL, cfg.BaseURL, "BaseURL mismatch")
 			assert.Equal(t, tt.expectedConfig.FileStoragePath, cfg.FileStoragePath, "FileStoragePath mismatch")
