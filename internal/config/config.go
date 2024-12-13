@@ -50,7 +50,4 @@ func ApplyPriority(cfg *Config) {
 		cfg.DatabaseDSN = envDatabaseDSN
 	}
 
-	if port := os.Getenv("SERVER_PORT"); port != "" {
-		cfg.ServerAddress = ":" + port
-	}
 }

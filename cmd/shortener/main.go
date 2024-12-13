@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 
@@ -22,6 +23,10 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to parse config", zap.Error(err))
 	}
+
+	config.DefineFlags(cfg)
+	flag.Parse()              // Парсим флаги командной строки после их определения
+	config.ApplyPriority(cfg) // Применяем приоритет параметров
 
 	// Инициализация хранилища
 	ctx := context.Background()
