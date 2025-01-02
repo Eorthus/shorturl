@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Eorthus/shorturl/internal/storage"
+	"github.com/Eorthus/shorturl/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -41,9 +41,9 @@ func (m *MockStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockStorage) GetUserURLs(ctx context.Context, userID string) ([]storage.URLData, error) {
+func (m *MockStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	args := m.Called(ctx, userID)
-	return args.Get(0).([]storage.URLData), args.Error(1)
+	return args.Get(0).([]models.URLData), args.Error(1)
 }
 
 func (m *MockStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {

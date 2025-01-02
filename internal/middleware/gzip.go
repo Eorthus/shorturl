@@ -8,11 +8,13 @@ import (
 	"sync"
 )
 
+// gzipWriter реализует интерфейс ResponseWriter с поддержкой сжатия
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
 
+// Write реализует метод Write для gzipWriter
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
@@ -23,6 +25,7 @@ var gzipWriterPool = sync.Pool{
 	},
 }
 
+// GzipMiddleware добавляет сжатие ответов gzip
 func GzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Обработка сжатых запросов

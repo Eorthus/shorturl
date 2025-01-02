@@ -8,14 +8,19 @@ import (
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
+// DatabaseStorage реализует хранение URL в базе данных
 type DatabaseStorage struct {
 	db *sql.DB
 }
 
+// ErrURLExists возникает при попытке сохранить существующий URL
 var ErrURLExists = errors.New("URL already exists")
 
+// NewDatabaseStorage создает новое хранилище в базе данных
 func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -51,10 +56,12 @@ func (s *DatabaseStorage) createTable(ctx context.Context) error {
 	return err
 }
 
+// Close закрывает соединение с базой данных
 func (s *DatabaseStorage) Close() error {
 	return s.db.Close()
 }
 
+// SaveURL сохраняет новый URL в базу данных
 func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, userID string) error {
 	_, err := s.db.ExecContext(ctx, "INSERT INTO urls (short_id, original_url, user_id) VALUES ($1, $2, $3)", shortID, longURL, userID)
 	if err != nil {
@@ -71,6 +78,7 @@ func (s *DatabaseStorage) SaveURL(ctx context.Context, shortID, longURL string, 
 	return nil
 }
 
+// GetURL возвращает оригинальный URL по короткому идентификатору
 func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 
 	var longURL string
@@ -87,10 +95,12 @@ func (s *DatabaseStorage) GetURL(ctx context.Context, shortID string) (string, b
 	return longURL, isDeleted, nil
 }
 
+// Ping пингует db
 func (s *DatabaseStorage) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
+// SaveURLBatch сохраняем массив URL
 func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -114,6 +124,7 @@ func (s *DatabaseStorage) SaveURLBatch(ctx context.Context, urls map[string]stri
 	return tx.Commit()
 }
 
+// GetShortIDByLongURL вытягивает short_id URL по идентификатору
 func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
 	var shortID string
 	err := s.db.QueryRowContext(ctx, "SELECT short_id FROM urls WHERE original_url = $1", longURL).Scan(&shortID)
@@ -126,16 +137,17 @@ func (s *DatabaseStorage) GetShortIDByLongURL(ctx context.Context, longURL strin
 	return shortID, nil
 }
 
-func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+// GetUserURLs отдает массив URL пользователя
+func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT short_id, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user URLs: %w", err)
 	}
 	defer rows.Close()
 
-	var urls []URLData
+	var urls []models.URLData
 	for rows.Next() {
-		var url URLData
+		var url models.URLData
 		if err := rows.Scan(&url.ShortURL, &url.OriginalURL); err != nil {
 			return nil, fmt.Errorf("failed to scan URL data: %w", err)
 		}
@@ -148,6 +160,7 @@ func (s *DatabaseStorage) GetUserURLs(ctx context.Context, userID string) ([]URL
 	return urls, nil
 }
 
+// MarkURLsAsDeleted помечает запись как удаленную
 func (s *DatabaseStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
 	result, err := s.db.ExecContext(ctx, `
         UPDATE urls

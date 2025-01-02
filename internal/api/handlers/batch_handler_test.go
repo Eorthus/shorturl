@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +56,7 @@ func TestHandleBatchShorten(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
 
 			if tt.expectedStatus == http.StatusCreated {
-				var response []BatchResponse
+				var response []models.BatchResponse
 				err := json.Unmarshal(rr.Body.Bytes(), &response)
 				require.NoError(t, err, "Failed to unmarshal response")
 

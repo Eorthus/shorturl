@@ -1,25 +1,30 @@
 package storage
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"os"
 	"slices"
 	"sync"
+
+	"github.com/Eorthus/shorturl/internal/models"
 )
 
+// FileStorage реализует файловое хранение URL
 type FileStorage struct {
 	filePath    string
-	data        map[string]URLData
+	data        map[string]models.URLData
 	userURLs    map[string][]string
 	deletedURLs map[string]bool
 	mutex       sync.RWMutex
 }
 
+// NewFileStorage создает новое файловое хранилище
 func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
 		filePath:    filePath,
-		data:        make(map[string]URLData),
+		data:        make(map[string]models.URLData),
 		userURLs:    make(map[string][]string),
 		deletedURLs: make(map[string]bool),
 	}
@@ -39,11 +44,12 @@ func NewFileStorage(ctx context.Context, filePath string) (*FileStorage, error) 
 	return fs, nil
 }
 
+// SaveURL сохраняет URL в файловое хранилище
 func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-	urlData := URLData{
+	urlData := models.URLData{
 		ShortURL:    shortID,
 		OriginalURL: longURL,
 	}
@@ -54,6 +60,7 @@ func (fs *FileStorage) SaveURL(ctx context.Context, shortID, longURL, userID str
 	return fs.saveToFile(ctx)
 }
 
+// GetURL возвращает URL из файлового хранилища
 func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
@@ -67,12 +74,13 @@ func (fs *FileStorage) GetURL(ctx context.Context, shortID string) (string, bool
 	return urlData.OriginalURL, isDeleted, nil
 }
 
+// SaveURLBatch сохраняем массив URL
 func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
 	for shortID, longURL := range urls {
-		fs.data[shortID] = URLData{
+		fs.data[shortID] = models.URLData{
 			ShortURL:    shortID,
 			OriginalURL: longURL,
 		}
@@ -82,6 +90,7 @@ func (fs *FileStorage) SaveURLBatch(ctx context.Context, urls map[string]string,
 	return fs.saveToFile(ctx)
 }
 
+// Ping пингует db
 func (fs *FileStorage) Ping(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -106,10 +115,13 @@ func (fs *FileStorage) saveToFile(ctx context.Context) error {
 		}
 		defer file.Close()
 
-		encoder := json.NewEncoder(file)
+		writer := bufio.NewWriter(file)
+		defer writer.Flush()
+
+		encoder := json.NewEncoder(writer)
 		for shortID, urlData := range fs.data {
 			data := struct {
-				URLData
+				models.URLData
 				IsDeleted bool `json:"is_deleted"`
 			}{
 				URLData:   urlData,
@@ -138,7 +150,7 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 		decoder := json.NewDecoder(file)
 		for decoder.More() {
 			var data struct {
-				URLData
+				models.URLData
 				IsDeleted bool `json:"is_deleted"`
 			}
 			if err := decoder.Decode(&data); err != nil {
@@ -154,6 +166,7 @@ func (fs *FileStorage) loadFromFile(ctx context.Context) error {
 	}
 }
 
+// GetShortIDByLongURL вытягивает short_id URL по идентификатору
 func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) (string, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
@@ -166,12 +179,13 @@ func (fs *FileStorage) GetShortIDByLongURL(ctx context.Context, longURL string) 
 	return "", nil
 }
 
-func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLData, error) {
+// GetUserURLs отдает массив URL пользователя
+func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]models.URLData, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
 	shortIDs := fs.userURLs[userID]
-	urls := make([]URLData, 0, len(shortIDs))
+	urls := make([]models.URLData, 0, len(shortIDs))
 	for _, shortID := range shortIDs {
 		if urlData, exists := fs.data[shortID]; exists {
 			urls = append(urls, urlData)
@@ -181,6 +195,7 @@ func (fs *FileStorage) GetUserURLs(ctx context.Context, userID string) ([]URLDat
 	return urls, nil
 }
 
+// MarkURLsAsDeleted помечает запись как удаленную
 func (fs *FileStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()

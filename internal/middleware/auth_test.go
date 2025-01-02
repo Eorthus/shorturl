@@ -61,7 +61,7 @@ func TestGetUserID(t *testing.T) {
 }
 
 func SetUserIDCookieForTest(req *http.Request, userID string) {
-	signature := generateSignature(userID)
+	signature := GenerateSignature(userID)
 	value := userID + ":" + signature
 	req.AddCookie(&http.Cookie{
 		Name:  cookieName,

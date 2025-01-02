@@ -1,3 +1,4 @@
+// Package config предоставляет структуры и функции для конфигурации сервиса.
 package config
 
 import (
@@ -7,7 +8,7 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
-// Config структура содержит конфигурационные параметры приложения
+// Config содержит параметры конфигурации сервиса.
 type Config struct {
 	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
 	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080"`
@@ -15,7 +16,7 @@ type Config struct {
 	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`
 }
 
-// ParseConfig инициализирует конфигурацию из переменных окружения
+// ParseConfig создает конфигурацию из переменных окружения.
 func ParseConfig() (*Config, error) {
 	cfg := &Config{}
 
@@ -27,15 +28,15 @@ func ParseConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// DefineFlags определяет флаги командной строки
+// DefineFlags определяет флаги командной строки.
 func DefineFlags(cfg *Config) {
-	flag.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")
-	flag.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")
-	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data")
-	flag.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database connection string")
+	flag.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")                // Адрес HTTP-сервера
+	flag.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")                 // Базовый URL для сокращенных ссылок
+	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data") // Путь к файлу хранения
+	flag.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database connection string")             // Строка подключения к базе данных
 }
 
-// ApplyPriority применяет приоритет параметров
+// ApplyPriority применяет приоритеты конфигурации.
 func ApplyPriority(cfg *Config) {
 	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
 		cfg.ServerAddress = envServerAddr
@@ -49,4 +50,5 @@ func ApplyPriority(cfg *Config) {
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		cfg.DatabaseDSN = envDatabaseDSN
 	}
+
 }

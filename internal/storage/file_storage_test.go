@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Eorthus/shorturl/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +66,7 @@ func TestFileStorage(t *testing.T) {
 		lines := splitLines(content)
 		for _, line := range lines {
 			var data struct {
-				URLData
+				models.URLData
 				IsDeleted bool `json:"is_deleted"`
 			}
 			err := json.Unmarshal(line, &data)
