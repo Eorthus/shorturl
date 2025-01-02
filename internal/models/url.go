@@ -36,3 +36,9 @@ type ShortenResponse struct {
 	// Result содержит сгенерированный короткий URL
 	Result string `json:"result"`
 }
+
+// ShortenRequest представляет собой запрос создания короткого URL.
+type ShortenRequest struct {
+	// URL содержит длинный URL для преобразования
+	URL string `json:"url" validate:"required,url"`
+}

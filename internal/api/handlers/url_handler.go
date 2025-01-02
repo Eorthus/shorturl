@@ -9,6 +9,7 @@ import (
 
 	"github.com/Eorthus/shorturl/internal/apperrors"
 	"github.com/Eorthus/shorturl/internal/middleware"
+	"github.com/Eorthus/shorturl/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -81,9 +82,7 @@ func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		middleware.SetUserIDCookie(w, userID)
 	}
 
-	var request struct {
-		URL string `json:"url"`
-	}
+	var request models.ShortenRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		apperrors.HandleHTTPError(w, apperrors.ErrInvalidJSONFormat, h.logger)
@@ -111,9 +110,7 @@ func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := struct {
-		Result string `json:"result"`
-	}{
+	response := models.ShortenResponse{
 		Result: h.cfg.BaseURL + "/" + shortID,
 	}
 

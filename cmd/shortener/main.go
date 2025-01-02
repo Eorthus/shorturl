@@ -23,6 +23,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -33,10 +34,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// Example: go run -ldflags "-X main.buildVersion=v1.0.0 -X main.buildDate=2024-01-02 -X main.buildCommit=abc123" main.go
+// Build information
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	// Вывод информации о сборке
+	printBuildInfo()
+
 	// Инициализация логгера
 	logger, _ := zap.NewProduction()
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Printf("Warning: error syncing logger: %v\n", err)
+		}
+	}()
 
 	// Парсинг конфигурации
 	cfg, err := config.ParseConfig()
@@ -70,4 +86,26 @@ func main() {
 		zap.String("database_dsn", cfg.DatabaseDSN),
 	)
 	log.Fatal(http.ListenAndServe(cfg.ServerAddress, router))
+}
+
+// printBuildInfo выводит информацию о сборке в stdout
+func printBuildInfo() {
+	version := buildVersion
+	if version == "" {
+		version = "N/A"
+	}
+
+	date := buildDate
+	if date == "" {
+		date = "N/A"
+	}
+
+	commit := buildCommit
+	if commit == "" {
+		commit = "N/A"
+	}
+
+	fmt.Printf("Build version: %s\n", version)
+	fmt.Printf("Build date: %s\n", date)
+	fmt.Printf("Build commit: %s\n", commit)
 }
