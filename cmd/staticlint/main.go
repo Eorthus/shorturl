@@ -70,7 +70,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
 	"honnef.co/go/tools/staticcheck"
 
-	"github.com/Eorthus/shorturl/cmd/staticlint/custom_analyzers"
+	"github.com/Eorthus/shorturl/cmd/staticlint/analyzers"
 )
 
 func main() {
@@ -131,7 +131,7 @@ func main() {
 
 	// Собственный анализатор
 	customAnalyzers := []*analysis.Analyzer{
-		custom_analyzers.ExitCheckAnalyzer,
+		analyzers.ExitCheckAnalyzer,
 	}
 
 	// Объединяем все анализаторы

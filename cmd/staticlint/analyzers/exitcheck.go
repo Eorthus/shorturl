@@ -6,7 +6,7 @@
 //
 // ExitCheckAnalyzer detects direct calls to os.Exit in the main function of
 // main packages.
-package custom_analyzers
+package analyzers
 
 import (
 	"go/ast"
@@ -81,7 +81,7 @@ func isInMainFunc(pass *analysis.Pass, node ast.Node) bool {
 	}
 
 	// Ищем родительскую функцию
-	var currentNode ast.Node = node
+	currentNode := node
 	for {
 		parent := findParentFunc(pass, currentNode)
 		if parent == nil {
