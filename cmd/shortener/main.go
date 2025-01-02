@@ -23,6 +23,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -36,7 +37,11 @@ import (
 func main() {
 	// Инициализация логгера
 	logger, _ := zap.NewProduction()
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Printf("Warning: error syncing logger: %v\n", err)
+		}
+	}()
 
 	// Парсинг конфигурации
 	cfg, err := config.ParseConfig()

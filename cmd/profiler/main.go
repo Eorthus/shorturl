@@ -35,7 +35,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Warning: error closing profile file: %v", err)
+		}
+	}()
 
 	// Запускаем HTTP сервер для профилирования
 	go func() {
