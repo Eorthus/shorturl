@@ -20,14 +20,14 @@ func TestLoadJSON(t *testing.T) {
 		content     string
 		filename    string
 		shouldError bool
-		want        *JsonConfig
+		want        *JSONConfig
 	}{
 		{
 			name:        "Valid config",
 			filename:    "config.json",
 			content:     `{"server_address": "localhost:8080", "base_url": "http://localhost", "enable_https": true}`,
 			shouldError: false,
-			want: &JsonConfig{
+			want: &JSONConfig{
 				ServerAddress: "localhost:8080",
 				BaseURL:       "http://localhost",
 				EnableHTTPS:   true,
@@ -72,7 +72,7 @@ func TestConfig_ApplyJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		base     *Config
-		json     *JsonConfig
+		json     *JSONConfig
 		expected *Config
 	}{
 		{
@@ -81,7 +81,7 @@ func TestConfig_ApplyJSON(t *testing.T) {
 				ServerAddress: "default:8080",
 				BaseURL:       "http://default",
 			},
-			json: &JsonConfig{
+			json: &JSONConfig{
 				ServerAddress: "new:8080",
 				BaseURL:       "http://new",
 				EnableHTTPS:   true,
@@ -98,7 +98,7 @@ func TestConfig_ApplyJSON(t *testing.T) {
 				ServerAddress: "default:8080",
 				BaseURL:       "http://default",
 			},
-			json: &JsonConfig{
+			json: &JSONConfig{
 				ServerAddress: "new:8080",
 			},
 			expected: &Config{

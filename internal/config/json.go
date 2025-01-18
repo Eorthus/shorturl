@@ -9,7 +9,7 @@ import (
 )
 
 // JsonConfig представляет структуру JSON конфигурации
-type JsonConfig struct {
+type JSONConfig struct {
 	ServerAddress   string `json:"server_address"`
 	BaseURL         string `json:"base_url"`
 	FileStoragePath string `json:"file_storage_path"`
@@ -20,7 +20,7 @@ type JsonConfig struct {
 }
 
 // LoadJSON загружает конфигурацию из JSON файла
-func LoadJSON(filename string) (*JsonConfig, error) {
+func LoadJSON(filename string) (*JSONConfig, error) {
 	if filename == "" {
 		return nil, nil
 	}
@@ -46,7 +46,7 @@ func LoadJSON(filename string) (*JsonConfig, error) {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	var cfg JsonConfig
+	var cfg JSONConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("error parsing JSON config: %w", err)
 	}
@@ -56,7 +56,7 @@ func LoadJSON(filename string) (*JsonConfig, error) {
 }
 
 // ApplyJSON применяет настройки из JSON к основной конфигурации
-func (cfg *Config) ApplyJSON(jsonCfg *JsonConfig) {
+func (cfg *Config) ApplyJSON(jsonCfg *JSONConfig) {
 	if jsonCfg == nil {
 		return
 	}
