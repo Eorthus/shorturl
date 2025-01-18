@@ -22,7 +22,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -56,14 +55,20 @@ func main() {
 	}()
 
 	// Парсинг конфигурации
-	cfg, err := config.ParseConfig()
-	if err != nil {
-		logger.Fatal("Failed to parse config", zap.Error(err))
-	}
+	// cfg, err := config.ParseConfig()
+	// if err != nil {
+	// 	logger.Fatal("Failed to parse config", zap.Error(err))
+	// }
 
-	config.DefineFlags(cfg)
-	flag.Parse()              // Парсим флаги командной строки после их определения
-	config.ApplyPriority(cfg) // Применяем приоритет параметров
+	// config.DefineFlags(cfg)
+	// flag.Parse()              // Парсим флаги командной строки после их определения
+	// config.ApplyPriority(cfg) // Применяем приоритет параметров
+
+	// Загрузка конфигурации
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logger.Fatal("Failed to load config", zap.Error(err))
+	}
 
 	// Инициализация хранилища
 	ctx := context.Background()
