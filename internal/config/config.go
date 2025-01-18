@@ -14,6 +14,9 @@ type Config struct {
 	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"url_storage.json"`
 	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS" envDefault:"false"`
+	CertFile        string `env:"CERT_FILE" envDefault:"server.crt"`
+	KeyFile         string `env:"KEY_FILE" envDefault:"server.key"`
 }
 
 // ParseConfig создает конфигурацию из переменных окружения.
@@ -34,6 +37,9 @@ func DefineFlags(cfg *Config) {
 	flag.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")                 // Базовый URL для сокращенных ссылок
 	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data") // Путь к файлу хранения
 	flag.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database connection string")             // Строка подключения к базе данных
+	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "Enable HTTPS")
+	flag.StringVar(&cfg.CertFile, "cert", cfg.CertFile, "Path to SSL certificate file")
+	flag.StringVar(&cfg.KeyFile, "key", cfg.KeyFile, "Path to SSL private key file")
 }
 
 // ApplyPriority применяет приоритеты конфигурации.
@@ -49,6 +55,15 @@ func ApplyPriority(cfg *Config) {
 	}
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		cfg.DatabaseDSN = envDatabaseDSN
+	}
+	if envEnableHTTPS := os.Getenv("ENABLE_HTTPS"); envEnableHTTPS != "" {
+		cfg.EnableHTTPS = envEnableHTTPS == "true"
+	}
+	if envCertFile := os.Getenv("CERT_FILE"); envCertFile != "" {
+		cfg.CertFile = envCertFile
+	}
+	if envKeyFile := os.Getenv("KEY_FILE"); envKeyFile != "" {
+		cfg.KeyFile = envKeyFile
 	}
 
 }

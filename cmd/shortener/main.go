@@ -31,6 +31,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/config"
 	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
+	"github.com/Eorthus/shorturl/internal/tls"
 	"go.uber.org/zap"
 )
 
@@ -85,6 +86,27 @@ func main() {
 		zap.String("file_storage_path", cfg.FileStoragePath),
 		zap.String("database_dsn", cfg.DatabaseDSN),
 	)
+
+	if cfg.EnableHTTPS {
+		// Проверяем наличие сертификата и ключа
+		if err := tls.EnsureCertificateExists(cfg.CertFile, cfg.KeyFile); err != nil {
+			logger.Fatal("Failed to ensure TLS certificates", zap.Error(err))
+		}
+
+		logger.Info("Starting HTTPS server",
+			zap.String("cert_file", cfg.CertFile),
+			zap.String("key_file", cfg.KeyFile),
+		)
+		err = http.ListenAndServeTLS(cfg.ServerAddress, cfg.CertFile, cfg.KeyFile, router)
+	} else {
+		logger.Info("Starting HTTP server")
+		err = http.ListenAndServe(cfg.ServerAddress, router)
+	}
+
+	if err != nil {
+		logger.Fatal("Server error", zap.Error(err))
+	}
+
 	log.Fatal(http.ListenAndServe(cfg.ServerAddress, router))
 }
 
