@@ -8,165 +8,122 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseConfig(t *testing.T) {
-	tests := []struct {
-		name             string
-		envVars          map[string]string
-		expectedAddr     string
-		expectedBaseURL  string
-		expectedFilePath string
-		expectedDBDSN    string
-	}{
-		{
-			name:             "Defaults",
-			envVars:          map[string]string{},
-			expectedAddr:     "localhost:8080",
-			expectedBaseURL:  "http://localhost:8080",
-			expectedFilePath: "url_storage.json",
-			expectedDBDSN:    "",
-		},
-		{
-			name: "WithEnvVariables",
-			envVars: map[string]string{
-				"SERVER_ADDRESS":    "localhost:8081",
-				"BASE_URL":          "http://shortener.com",
-				"FILE_STORAGE_PATH": "/tmp/storage.json",
-				"DATABASE_DSN":      "postgres://user:pass@localhost:5432/dbname",
-			},
-			expectedAddr:     "localhost:8081",
-			expectedBaseURL:  "http://shortener.com",
-			expectedFilePath: "/tmp/storage.json",
-			expectedDBDSN:    "postgres://user:pass@localhost:5432/dbname",
-		},
-	}
+func TestConfigBuilder(t *testing.T) {
+	t.Run("Builder with manual configuration", func(t *testing.T) {
+		builder := NewConfigBuilder()
+		config := builder.
+			WithServerConfig("localhost:8080", "http://localhost:8080").
+			WithStorageConfig("storage.json", "postgres://localhost/db").
+			WithTLSConfig(true, "cert.pem", "key.pem").
+			Build()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			// Сохраняем исходные значения переменных окружения
-			originalEnv := make(map[string]string)
-			for key := range tt.envVars {
-				originalEnv[key] = os.Getenv(key)
-			}
+		// Проверяем Server config
+		assert.Equal(t, "localhost:8080", config.Server.ServerAddress)
+		assert.Equal(t, "http://localhost:8080", config.Server.BaseURL)
 
-			// Устанавливаем переменные окружения для теста
-			for key, value := range tt.envVars {
-				os.Setenv(key, value)
-			}
+		// Проверяем Storage config
+		assert.Equal(t, "storage.json", config.Storage.FileStoragePath)
+		assert.Equal(t, "postgres://localhost/db", config.Storage.DatabaseDSN)
 
-			// Восстанавливаем исходные значения переменных окружения после теста
-			defer func() {
-				for key, value := range originalEnv {
-					if value == "" {
-						os.Unsetenv(key)
-					} else {
-						os.Setenv(key, value)
-					}
-				}
-			}()
+		// Проверяем TLS config
+		assert.True(t, config.TLS.EnableHTTPS)
+		assert.Equal(t, "cert.pem", config.TLS.CertFile)
+		assert.Equal(t, "key.pem", config.TLS.KeyFile)
+	})
 
-			// Инициализация конфигурации
-			cfg, err := ParseConfig()
+	t.Run("Builder with environment variables", func(t *testing.T) {
+		// Сохраняем оригинальные значения
+		envVars := map[string]string{
+			"SERVER_ADDRESS":    "localhost:9090",
+			"BASE_URL":          "http://example.com",
+			"FILE_STORAGE_PATH": "/tmp/data.json",
+			"DATABASE_DSN":      "postgres://user:pass@localhost:5432/testdb",
+			"ENABLE_HTTPS":      "true",
+			"CERT_FILE":         "custom.crt",
+			"KEY_FILE":          "custom.key",
+		}
 
-			// Проверка на отсутствие ошибки
-			assert.NoError(t, err, "ParseConfig should not return an error")
+		for k, v := range envVars {
+			oldVal := os.Getenv(k)
+			os.Setenv(k, v)
+			defer os.Setenv(k, oldVal)
+		}
 
-			// Проверка значений
-			assert.Equal(t, tt.expectedAddr, cfg.ServerAddress, "ServerAddress mismatch")
-			assert.Equal(t, tt.expectedBaseURL, cfg.BaseURL, "BaseURL mismatch")
-			assert.Equal(t, tt.expectedFilePath, cfg.FileStoragePath, "FileStoragePath mismatch")
-			assert.Equal(t, tt.expectedDBDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
-		})
-	}
-}
+		builder := NewConfigBuilder()
+		builder, err := builder.FromEnv()
+		assert.NoError(t, err)
 
-func TestDefineFlags(t *testing.T) {
-	// Создаем новый FlagSet для изоляции теста
-	flagSet := flag.NewFlagSet("test", flag.ContinueOnError)
+		config := builder.Build()
 
-	// Инициализируем структуру Config с некоторыми начальными значениями
-	cfg := &Config{
-		ServerAddress:   "localhost:8080",
-		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "url_storage.json",
-		DatabaseDSN:     "",
-	}
+		// Проверяем значения из переменных окружения
+		assert.Equal(t, "localhost:9090", config.Server.ServerAddress)
+		assert.Equal(t, "http://example.com", config.Server.BaseURL)
+		assert.Equal(t, "/tmp/data.json", config.Storage.FileStoragePath)
+		assert.Equal(t, "postgres://user:pass@localhost:5432/testdb", config.Storage.DatabaseDSN)
+		assert.True(t, config.TLS.EnableHTTPS)
+		assert.Equal(t, "custom.crt", config.TLS.CertFile)
+		assert.Equal(t, "custom.key", config.TLS.KeyFile)
+	})
 
-	// Определяем флаги на основе новой FlagSet
-	flagSet.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")
-	flagSet.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")
-	flagSet.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data")
-	flagSet.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database DSN")
+	t.Run("Builder with command flags", func(t *testing.T) {
+		// Сохраняем оригинальные аргументы
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
 
-	// Устанавливаем значения флагов как если бы они были переданы в командной строке
-	flagSet.Parse([]string{"-a=localhost:7070", "-b=http://test.com", "-f=/tmp/test_storage.json", "-d=postgres://test:test@localhost:5432/testdb"})
+		// Устанавливаем тестовые аргументы
+		os.Args = []string{"cmd",
+			"-a=localhost:7070",
+			"-b=http://test.com",
+			"-f=/tmp/test_storage.json",
+			"-d=postgres://test:test@localhost:5432/testdb",
+			"-s=true",
+			"-cert=test.crt",
+			"-key=test.key",
+		}
 
-	// Проверяем, что значения были правильно обновлены
-	assert.Equal(t, "localhost:7070", cfg.ServerAddress, "ServerAddress mismatch")
-	assert.Equal(t, "http://test.com", cfg.BaseURL, "BaseURL mismatch")
-	assert.Equal(t, "/tmp/test_storage.json", cfg.FileStoragePath, "FileStoragePath mismatch")
-	assert.Equal(t, "postgres://test:test@localhost:5432/testdb", cfg.DatabaseDSN, "DatabaseDSN mismatch")
-}
+		// Сбрасываем флаги перед тестом
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-func TestApplyPriority(t *testing.T) {
-	tests := []struct {
-		name           string
-		envVars        map[string]string
-		initialConfig  Config
-		expectedConfig Config
-	}{
-		{
-			name: "PartialEnvVariables",
-			envVars: map[string]string{
-				"SERVER_ADDRESS": "localhost:9090",
-				"DATABASE_DSN":   "postgres://user:pass@localhost:5432/testdb",
-			},
-			initialConfig: Config{
-				ServerAddress:   "localhost:8080",
-				BaseURL:         "http://localhost:8080",
-				FileStoragePath: "url_storage.json",
-				DatabaseDSN:     "",
-			},
-			expectedConfig: Config{
-				ServerAddress:   "localhost:9090",
-				BaseURL:         "http://localhost:8080", // Оставляем неизменным, так как нет в envVars
-				FileStoragePath: "url_storage.json",      // Оставляем неизменным, так как нет в envVars
-				DatabaseDSN:     "postgres://user:pass@localhost:5432/testdb",
-			},
-		},
-	}
+		builder := NewConfigBuilder()
+		builder.FromFlags()
+		config := builder.Build()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Сохраняем исходные значения переменных окружения
-			originalEnv := make(map[string]string)
-			for key := range tt.envVars {
-				originalEnv[key] = os.Getenv(key)
-			}
+		// Проверяем значения из флагов
+		assert.Equal(t, "localhost:7070", config.Server.ServerAddress)
+		assert.Equal(t, "http://test.com", config.Server.BaseURL)
+		assert.Equal(t, "/tmp/test_storage.json", config.Storage.FileStoragePath)
+		assert.Equal(t, "postgres://test:test@localhost:5432/testdb", config.Storage.DatabaseDSN)
+		assert.True(t, config.TLS.EnableHTTPS)
+		assert.Equal(t, "test.crt", config.TLS.CertFile)
+		assert.Equal(t, "test.key", config.TLS.KeyFile)
+	})
 
-			// Устанавливаем тестовые переменные окружения
-			for key, value := range tt.envVars {
-				os.Setenv(key, value)
-			}
+	t.Run("LoadConfig full configuration", func(t *testing.T) {
+		// Устанавливаем переменные окружения
+		envVars := map[string]string{
+			"SERVER_ADDRESS": "localhost:5000",
+			"BASE_URL":       "http://env.com",
+		}
 
-			// Восстанавливаем исходные значения после теста
-			defer func() {
-				for key, value := range originalEnv {
-					if value == "" {
-						os.Unsetenv(key)
-					} else {
-						os.Setenv(key, value)
-					}
-				}
-			}()
+		for k, v := range envVars {
+			oldVal := os.Getenv(k)
+			os.Setenv(k, v)
+			defer os.Setenv(k, oldVal)
+		}
 
-			cfg := tt.initialConfig
-			ApplyPriority(&cfg)
+		// Устанавливаем аргументы командной строки
+		oldArgs := os.Args
+		os.Args = []string{"cmd", "-f=/tmp/flags.json"}
+		defer func() { os.Args = oldArgs }()
 
-			assert.Equal(t, tt.expectedConfig.ServerAddress, cfg.ServerAddress, "ServerAddress mismatch")
-			assert.Equal(t, tt.expectedConfig.BaseURL, cfg.BaseURL, "BaseURL mismatch")
-			assert.Equal(t, tt.expectedConfig.FileStoragePath, cfg.FileStoragePath, "FileStoragePath mismatch")
-			assert.Equal(t, tt.expectedConfig.DatabaseDSN, cfg.DatabaseDSN, "DatabaseDSN mismatch")
-		})
-	}
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+		config, err := LoadConfig()
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Проверяем приоритет загрузки конфигурации
+		assert.Equal(t, "localhost:5000", config.Server.ServerAddress)     // из env
+		assert.Equal(t, "/tmp/flags.json", config.Storage.FileStoragePath) // из флагов
+	})
 }

@@ -8,15 +8,11 @@ import (
 	"path/filepath"
 )
 
-// JsonConfig представляет структуру JSON конфигурации
+// JSONConfig представляет структуру JSON конфигурации
 type JSONConfig struct {
-	ServerAddress   string `json:"server_address"`
-	BaseURL         string `json:"base_url"`
-	FileStoragePath string `json:"file_storage_path"`
-	DatabaseDSN     string `json:"database_dsn"`
-	EnableHTTPS     bool   `json:"enable_https"`
-	CertFile        string `json:"cert_file"`
-	KeyFile         string `json:"key_file"`
+	Server  ServerConfig  `json:"server"`
+	TLS     TLSConfig     `json:"tls"`
+	Storage StorageConfig `json:"storage"`
 }
 
 // LoadJSON загружает конфигурацию из JSON файла
@@ -61,26 +57,30 @@ func (cfg *Config) ApplyJSON(jsonCfg *JSONConfig) {
 		return
 	}
 
-	// Применяем только непустые значения из JSON
-	if jsonCfg.ServerAddress != "" {
-		cfg.ServerAddress = jsonCfg.ServerAddress
+	// Применяем настройки сервера
+	if jsonCfg.Server.ServerAddress != "" {
+		cfg.Server.ServerAddress = jsonCfg.Server.ServerAddress
 	}
-	if jsonCfg.BaseURL != "" {
-		cfg.BaseURL = jsonCfg.BaseURL
+	if jsonCfg.Server.BaseURL != "" {
+		cfg.Server.BaseURL = jsonCfg.Server.BaseURL
 	}
-	if jsonCfg.FileStoragePath != "" {
-		cfg.FileStoragePath = jsonCfg.FileStoragePath
+
+	// Применяем настройки TLS
+	if jsonCfg.TLS.EnableHTTPS {
+		cfg.TLS.EnableHTTPS = true
 	}
-	if jsonCfg.DatabaseDSN != "" {
-		cfg.DatabaseDSN = jsonCfg.DatabaseDSN
+	if jsonCfg.TLS.CertFile != "" {
+		cfg.TLS.CertFile = jsonCfg.TLS.CertFile
 	}
-	if jsonCfg.EnableHTTPS {
-		cfg.EnableHTTPS = true
+	if jsonCfg.TLS.KeyFile != "" {
+		cfg.TLS.KeyFile = jsonCfg.TLS.KeyFile
 	}
-	if jsonCfg.CertFile != "" {
-		cfg.CertFile = jsonCfg.CertFile
+
+	// Применяем настройки хранилища
+	if jsonCfg.Storage.FileStoragePath != "" {
+		cfg.Storage.FileStoragePath = jsonCfg.Storage.FileStoragePath
 	}
-	if jsonCfg.KeyFile != "" {
-		cfg.KeyFile = jsonCfg.KeyFile
+	if jsonCfg.Storage.DatabaseDSN != "" {
+		cfg.Storage.DatabaseDSN = jsonCfg.Storage.DatabaseDSN
 	}
 }

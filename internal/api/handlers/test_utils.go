@@ -17,7 +17,9 @@ func setupRouter(t *testing.T) (*chi.Mux, storage.Storage) {
 	store, err := storage.NewMemoryStorage(ctx)
 	require.NoError(t, err)
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 
 	logger := zaptest.NewLogger(t)

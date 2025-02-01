@@ -9,107 +9,166 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
-// Config содержит параметры конфигурации сервиса.
+// ServerConfig содержит настройки HTTP сервера
+type ServerConfig struct {
+	ServerAddress string `env:"SERVER_ADDRESS" envDefault:"localhost:8080" json:"server_address" `
+	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080" json:"base_url"`
+}
+
+// TLSConfig содержит настройки TLS/HTTPS
+type TLSConfig struct {
+	EnableHTTPS bool   `env:"ENABLE_HTTPS" envDefault:"false" json:"enable_https"`
+	CertFile    string `env:"CERT_FILE" envDefault:"server.crt" json:"cert_file"`
+	KeyFile     string `env:"KEY_FILE" envDefault:"server.key" json:"key_file"`
+	ConfigFile  string `env:"CONFIG" envDefault:""`
+}
+
+// StorageConfig содержит настройки хранилища
+type StorageConfig struct {
+	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"url_storage.json" json:"file_storage_path"`
+	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:"" json:"database_dsn"`
+}
+
+// Config содержит все компоненты конфигурации сервиса
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"url_storage.json"`
-	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`
-	EnableHTTPS     bool   `env:"ENABLE_HTTPS" envDefault:"false"`
-	CertFile        string `env:"CERT_FILE" envDefault:"server.crt"`
-	KeyFile         string `env:"KEY_FILE" envDefault:"server.key"`
-	ConfigFile      string `env:"CONFIG" envDefault:""`
+	Server     ServerConfig
+	Storage    StorageConfig
+	TLS        TLSConfig
+	ConfigFile string `env:"CONFIG" envDefault:""`
 }
 
-// ParseConfig создает конфигурацию из переменных окружения.
-func ParseConfig() (*Config, error) {
-	cfg := &Config{}
+// ConfigBuilder реализует паттерн строителя для конфигурации
+type ConfigBuilder struct {
+	config *Config
+}
 
-	// Парсинг переменных окружения
-	if err := env.Parse(cfg); err != nil {
+// NewConfigBuilder создает новый экземпляр строителя конфигурации
+func NewConfigBuilder() *ConfigBuilder {
+	return &ConfigBuilder{
+		config: &Config{},
+	}
+}
+
+// WithServerConfig устанавливает конфигурацию сервера
+func (b *ConfigBuilder) WithServerConfig(addr, baseURL string) *ConfigBuilder {
+	b.config.Server.ServerAddress = addr
+	b.config.Server.BaseURL = baseURL
+	return b
+}
+
+// WithStorageConfig устанавливает конфигурацию хранилища
+func (b *ConfigBuilder) WithStorageConfig(filePath, dbDSN string) *ConfigBuilder {
+	b.config.Storage.FileStoragePath = filePath
+	b.config.Storage.DatabaseDSN = dbDSN
+	return b
+}
+
+// WithTLSConfig устанавливает конфигурацию TLS
+func (b *ConfigBuilder) WithTLSConfig(enable bool, certFile, keyFile string) *ConfigBuilder {
+	b.config.TLS.EnableHTTPS = enable
+	b.config.TLS.CertFile = certFile
+	b.config.TLS.KeyFile = keyFile
+	return b
+}
+
+// FromEnv загружает конфигурацию из переменных окружения
+func (b *ConfigBuilder) FromEnv() (*ConfigBuilder, error) {
+	if err := env.Parse(&b.config.Server); err != nil {
 		return nil, err
 	}
-
-	return cfg, nil
-}
-
-// DefineFlags определяет флаги командной строки.
-func DefineFlags(cfg *Config) {
-	flag.StringVar(&cfg.ServerAddress, "a", cfg.ServerAddress, "HTTP server address")                // Адрес HTTP-сервера
-	flag.StringVar(&cfg.BaseURL, "b", cfg.BaseURL, "Base address for shortened URL")                 // Базовый URL для сокращенных ссылок
-	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "File storage path for URL data") // Путь к файлу хранения
-	flag.StringVar(&cfg.DatabaseDSN, "d", cfg.DatabaseDSN, "Database connection string")             // Строка подключения к базе данных
-	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "Enable HTTPS")
-	flag.StringVar(&cfg.CertFile, "cert", cfg.CertFile, "Path to SSL certificate file")
-	flag.StringVar(&cfg.KeyFile, "key", cfg.KeyFile, "Path to SSL private key file")
-	flag.StringVar(&cfg.ConfigFile, "c", cfg.ConfigFile, "Path to configuration file")
-	flag.StringVar(&cfg.ConfigFile, "config", cfg.ConfigFile, "Path to configuration file") // Алиас для -c
-}
-
-// ApplyPriority применяет приоритеты конфигурации.
-func ApplyPriority(cfg *Config) {
-	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
-		cfg.ServerAddress = envServerAddr
-	}
-	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
-		cfg.BaseURL = envBaseURL
-	}
-	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
-		cfg.FileStoragePath = envFilePath
-	}
-	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
-		cfg.DatabaseDSN = envDatabaseDSN
-	}
-	if envEnableHTTPS := os.Getenv("ENABLE_HTTPS"); envEnableHTTPS != "" {
-		cfg.EnableHTTPS = envEnableHTTPS == "true"
-	}
-	if envCertFile := os.Getenv("CERT_FILE"); envCertFile != "" {
-		cfg.CertFile = envCertFile
-	}
-	if envKeyFile := os.Getenv("KEY_FILE"); envKeyFile != "" {
-		cfg.KeyFile = envKeyFile
-	}
-
-}
-
-// LoadConfig загружает полную конфигурацию, соблюдая приоритеты:
-// 1. Флаги командной строки (высший приоритет)
-// 2. Переменные окружения
-// 3. Файл конфигурации (низший приоритет)
-func LoadConfig() (*Config, error) {
-	// Создаем конфигурацию с дефолтными значениями
-	cfg := &Config{}
-
-	// Загружаем значения из переменных окружения
-	if err := env.Parse(cfg); err != nil {
+	if err := env.Parse(&b.config.Storage); err != nil {
 		return nil, err
 	}
+	if err := env.Parse(&b.config.TLS); err != nil {
+		return nil, err
+	}
+	if err := env.Parse(b.config); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
 
-	// Определяем флаги командной строки единожды
-	DefineFlags(cfg)
+// FromFlags загружает конфигурацию из флагов командной строки
+func (b *ConfigBuilder) FromFlags() *ConfigBuilder {
+	// Флаги для Server
+	flag.StringVar(&b.config.Server.ServerAddress, "a", b.config.Server.ServerAddress, "HTTP server address")
+	flag.StringVar(&b.config.Server.BaseURL, "b", b.config.Server.BaseURL, "Base address for shortened URL")
+
+	// Флаги для Storage
+	flag.StringVar(&b.config.Storage.FileStoragePath, "f", b.config.Storage.FileStoragePath, "File storage path")
+	flag.StringVar(&b.config.Storage.DatabaseDSN, "d", b.config.Storage.DatabaseDSN, "Database connection string")
+
+	// Флаги для TLS
+	flag.BoolVar(&b.config.TLS.EnableHTTPS, "s", b.config.TLS.EnableHTTPS, "Enable HTTPS")
+	flag.StringVar(&b.config.TLS.CertFile, "cert", b.config.TLS.CertFile, "Path to SSL certificate file")
+	flag.StringVar(&b.config.TLS.KeyFile, "key", b.config.TLS.KeyFile, "Path to SSL private key file")
+
+	// Общие флаги
+	flag.StringVar(&b.config.ConfigFile, "c", b.config.ConfigFile, "Path to configuration file")
+	flag.StringVar(&b.config.ConfigFile, "config", b.config.ConfigFile, "Path to configuration file")
+
 	flag.Parse()
+	return b
+}
 
-	// Устанавливаем путь к файлу конфигурации из переменной окружения, если не задан флагом
-	if envConfig := os.Getenv("CONFIG"); envConfig != "" && cfg.ConfigFile == "" {
-		cfg.ConfigFile = envConfig
+// FromJSON загружает конфигурацию из JSON файла
+func (b *ConfigBuilder) FromJSON(filename string) (*ConfigBuilder, error) {
+	if filename == "" {
+		return b, nil
 	}
+
 	// Добавляем расширение .json, если его нет
-	if cfg.ConfigFile != "" && !strings.HasSuffix(cfg.ConfigFile, ".json") {
-		cfg.ConfigFile = cfg.ConfigFile + ".json"
+	if !strings.HasSuffix(filename, ".json") {
+		filename = filename + ".json"
 	}
 
-	// Загружаем конфигурацию из JSON файла (если указан)
-	jsonCfg, err := LoadJSON(cfg.ConfigFile)
+	jsonCfg, err := LoadJSON(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	// Применяем конфигурации в порядке приоритета (от низшего к высшему)
 	if jsonCfg != nil {
-		cfg.ApplyJSON(jsonCfg) // Применяем значения из JSON (низший приоритет)
+		b.config.Server = jsonCfg.Server
+		b.config.Storage = jsonCfg.Storage
+		b.config.TLS = jsonCfg.TLS
 	}
-	ApplyPriority(cfg) // Применяем значения из переменных окружения
-	// Флаги уже применены ранее и имеют наивысший приоритет
 
-	return cfg, nil
+	return b, nil
+}
+
+// Build собирает и возвращает готовую конфигурацию
+func (b *ConfigBuilder) Build() *Config {
+	return b.config
+}
+
+// LoadConfig загружает полную конфигурацию используя паттерн строителя
+func LoadConfig() (*Config, error) {
+	builder := NewConfigBuilder()
+
+	// Загружаем конфигурацию из переменных окружения
+	builder, err := builder.FromEnv()
+	if err != nil {
+		return nil, err
+	}
+
+	// Загружаем конфигурацию из флагов командной строки
+	builder.FromFlags()
+
+	// Определяем путь к файлу конфигурации
+	configFile := os.Getenv("CONFIG")
+	if configFile == "" {
+		if flag.Lookup("config") != nil {
+			configFile = flag.Lookup("config").Value.String()
+		}
+	}
+
+	// Загружаем конфигурацию из JSON файла если указан
+	if configFile != "" {
+		builder, err = builder.FromJSON(configFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return builder.Build(), nil
 }

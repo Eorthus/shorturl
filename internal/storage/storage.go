@@ -55,10 +55,10 @@ type Storage interface {
 
 // InitStorage инициализирует хранилище в зависимости от конфигурации
 func InitStorage(ctx context.Context, cfg *config.Config) (Storage, error) {
-	if cfg.DatabaseDSN != "" {
-		return NewDatabaseStorage(ctx, cfg.DatabaseDSN)
-	} else if cfg.FileStoragePath != "" {
-		return NewFileStorage(ctx, cfg.FileStoragePath)
+	if cfg.Storage.DatabaseDSN != "" {
+		return NewDatabaseStorage(ctx, cfg.Storage.DatabaseDSN)
+	} else if cfg.Storage.FileStoragePath != "" {
+		return NewFileStorage(ctx, cfg.Storage.FileStoragePath)
 	} else {
 		return NewMemoryStorage(ctx)
 	}
