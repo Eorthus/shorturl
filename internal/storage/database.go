@@ -179,6 +179,7 @@ func (s *DatabaseStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []stri
 	return nil
 }
 
+// GetStats собирает статистику
 func (s *DatabaseStorage) GetStats(ctx context.Context) (*models.StatsResponse, error) {
 	var stats models.StatsResponse
 

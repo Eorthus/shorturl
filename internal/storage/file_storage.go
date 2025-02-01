@@ -210,6 +210,7 @@ func (fs *FileStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string,
 	return fs.saveToFile(ctx)
 }
 
+// GetStats собирает статистику
 func (fs *FileStorage) GetStats(ctx context.Context) (*models.StatsResponse, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
