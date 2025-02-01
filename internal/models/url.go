@@ -42,3 +42,9 @@ type ShortenRequest struct {
 	// URL содержит длинный URL для преобразования
 	URL string `json:"url" validate:"required,url"`
 }
+
+// StatsResponse представляет статистику сервиса
+type StatsResponse struct {
+	URLs  int `json:"urls"`  // количество сокращённых URL в сервисе
+	Users int `json:"users"` // количество пользователей в сервисе
+}

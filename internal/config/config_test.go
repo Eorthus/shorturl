@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigBuilder(t *testing.T) {
@@ -125,5 +126,63 @@ func TestConfigBuilder(t *testing.T) {
 		// Проверяем приоритет загрузки конфигурации
 		assert.Equal(t, "localhost:5000", config.Server.ServerAddress)     // из env
 		assert.Equal(t, "/tmp/flags.json", config.Storage.FileStoragePath) // из флагов
+	})
+
+	t.Run("Config with trusted subnet", func(t *testing.T) {
+		builder := NewConfigBuilder()
+		config := builder.
+			WithServerConfig("localhost:8080", "http://localhost:8080").
+			WithTrustedSubnet("192.168.1.0/24").
+			Build()
+
+		assert.Equal(t, "192.168.1.0/24", config.Server.TrustedSubnet)
+	})
+
+	t.Run("Environment variables with trusted subnet", func(t *testing.T) {
+		// Сохраняем оригинальное значение
+		oldSubnet := os.Getenv("TRUSTED_SUBNET")
+		os.Setenv("TRUSTED_SUBNET", "10.0.0.0/8")
+		defer os.Setenv("TRUSTED_SUBNET", oldSubnet)
+
+		builder := NewConfigBuilder()
+		builder, err := builder.FromEnv()
+		assert.NoError(t, err)
+
+		config := builder.Build()
+		assert.Equal(t, "10.0.0.0/8", config.Server.TrustedSubnet)
+	})
+
+	t.Run("Command line flags with trusted subnet", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{"cmd", "-t=172.16.0.0/16"}
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+		builder := NewConfigBuilder()
+		config := builder.FromFlags().Build()
+
+		assert.Equal(t, "172.16.0.0/16", config.Server.TrustedSubnet)
+	})
+
+	t.Run("JSON config with trusted subnet", func(t *testing.T) {
+		tempFile, err := os.CreateTemp("", "config*.json")
+		require.NoError(t, err)
+		defer os.Remove(tempFile.Name())
+
+		config := `{
+            "server": {
+                "trusted_subnet": "192.168.0.0/16"
+            }
+        }`
+		err = os.WriteFile(tempFile.Name(), []byte(config), 0644)
+		require.NoError(t, err)
+
+		builder := NewConfigBuilder()
+		builder, err = builder.FromJSON(tempFile.Name())
+		require.NoError(t, err)
+
+		conf := builder.Build()
+		assert.Equal(t, "192.168.0.0/16", conf.Server.TrustedSubnet)
 	})
 }

@@ -14,7 +14,7 @@ import (
 )
 
 func TestHandleBatchShorten(t *testing.T) {
-	r, _ := setupRouter(t)
+	r, _ := setupRouter(t, "")
 
 	tests := []struct {
 		name           string

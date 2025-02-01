@@ -13,6 +13,7 @@ import (
 type ServerConfig struct {
 	ServerAddress string `env:"SERVER_ADDRESS" envDefault:"localhost:8080" json:"server_address" `
 	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080" json:"base_url"`
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 }
 
 // TLSConfig содержит настройки TLS/HTTPS
@@ -63,6 +64,12 @@ func (b *ConfigBuilder) WithStorageConfig(filePath, dbDSN string) *ConfigBuilder
 	return b
 }
 
+// В ConfigBuilder добавляем метод для установки доверенной подсети
+func (b *ConfigBuilder) WithTrustedSubnet(subnet string) *ConfigBuilder {
+	b.config.Server.TrustedSubnet = subnet
+	return b
+}
+
 // WithTLSConfig устанавливает конфигурацию TLS
 func (b *ConfigBuilder) WithTLSConfig(enable bool, certFile, keyFile string) *ConfigBuilder {
 	b.config.TLS.EnableHTTPS = enable
@@ -93,6 +100,7 @@ func (b *ConfigBuilder) FromFlags() *ConfigBuilder {
 	// Флаги для Server
 	flag.StringVar(&b.config.Server.ServerAddress, "a", b.config.Server.ServerAddress, "HTTP server address")
 	flag.StringVar(&b.config.Server.BaseURL, "b", b.config.Server.BaseURL, "Base address for shortened URL")
+	flag.StringVar(&b.config.Server.TrustedSubnet, "t", b.config.Server.TrustedSubnet, "Trusted subnet in CIDR notation")
 
 	// Флаги для Storage
 	flag.StringVar(&b.config.Storage.FileStoragePath, "f", b.config.Storage.FileStoragePath, "File storage path")

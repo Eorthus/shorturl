@@ -158,3 +158,48 @@ func TestDatabaseStorage_MarkURLsAsDeleted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestDatabaseStorage_GetStats(t *testing.T) {
+	store, mock := setupTest(t)
+	defer store.db.Close()
+
+	t.Run("Success case", func(t *testing.T) {
+		// Подготавливаем моки для запросов
+		urlCountRows := sqlmock.NewRows([]string{"count"}).AddRow(5)
+		userCountRows := sqlmock.NewRows([]string{"count"}).AddRow(3)
+
+		mock.ExpectQuery("SELECT COUNT\\(DISTINCT short_id\\) FROM urls").
+			WillReturnRows(urlCountRows)
+		mock.ExpectQuery("SELECT COUNT\\(DISTINCT user_id\\) FROM urls").
+			WillReturnRows(userCountRows)
+
+		stats, err := store.GetStats(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, 5, stats.URLs)
+		assert.Equal(t, 3, stats.Users)
+	})
+
+	t.Run("Empty database", func(t *testing.T) {
+		urlCountRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
+		userCountRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
+
+		mock.ExpectQuery("SELECT COUNT\\(DISTINCT short_id\\) FROM urls").
+			WillReturnRows(urlCountRows)
+		mock.ExpectQuery("SELECT COUNT\\(DISTINCT user_id\\) FROM urls").
+			WillReturnRows(userCountRows)
+
+		stats, err := store.GetStats(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, 0, stats.URLs)
+		assert.Equal(t, 0, stats.Users)
+	})
+
+	t.Run("Database error", func(t *testing.T) {
+		mock.ExpectQuery("SELECT COUNT\\(DISTINCT short_id\\) FROM urls").
+			WillReturnError(sql.ErrConnDone)
+
+		stats, err := store.GetStats(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, stats)
+	})
+}

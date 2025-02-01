@@ -8,6 +8,7 @@ import (
 	"github.com/Eorthus/shorturl/internal/models"
 	"github.com/Eorthus/shorturl/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShortenURL(t *testing.T) {
@@ -137,4 +138,56 @@ func TestPing(t *testing.T) {
 
 	err := service.Ping(ctx)
 	assert.NoError(t, err)
+}
+
+func TestGetStats(t *testing.T) {
+	ctx := context.Background()
+	store, _ := storage.NewMemoryStorage(ctx)
+	service := NewURLService(store)
+
+	// Подготавливаем тестовые данные
+	testData := []struct {
+		shortID string
+		longURL string
+		userID  string
+	}{
+		{"abc123", "https://example.com", "user1"},
+		{"def456", "https://example.org", "user2"},
+		{"ghi789", "https://example.net", "user1"},
+		{"jkl012", "https://example.edu", "user3"},
+	}
+
+	for _, td := range testData {
+		err := store.SaveURL(ctx, td.shortID, td.longURL, td.userID)
+		require.NoError(t, err)
+	}
+
+	t.Run("Get stats returns correct counts", func(t *testing.T) {
+		stats, err := service.GetStats(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 4, stats.URLs, "Should have 4 URLs")
+		assert.Equal(t, 3, stats.Users, "Should have 3 unique users")
+	})
+
+	t.Run("Stats after URL deletion", func(t *testing.T) {
+		// Помечаем URL как удаленный
+		err := store.MarkURLsAsDeleted(ctx, []string{"abc123"}, "user1")
+		require.NoError(t, err)
+
+		// Проверяем, что статистика учитывает и удаленные URL
+		stats, err := service.GetStats(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 4, stats.URLs, "Should still count deleted URLs")
+		assert.Equal(t, 3, stats.Users, "Should maintain user count")
+	})
+
+	t.Run("Stats with empty storage", func(t *testing.T) {
+		emptyStore, _ := storage.NewMemoryStorage(ctx)
+		emptyService := NewURLService(emptyStore)
+
+		stats, err := emptyService.GetStats(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 0, stats.URLs, "Should have 0 URLs")
+		assert.Equal(t, 0, stats.Users, "Should have 0 users")
+	})
 }

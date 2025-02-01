@@ -51,6 +51,9 @@ type Storage interface {
 
 	// MarkURLsAsDeleted помечает указанные URL как удаленные для пользователя.
 	MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error
+
+	// GetStats возвращает статистику
+	GetStats(ctx context.Context) (*models.StatsResponse, error)
 }
 
 // InitStorage инициализирует хранилище в зависимости от конфигурации
