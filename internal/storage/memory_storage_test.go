@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -191,5 +192,125 @@ func TestMemoryStorage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, isDeleted)
 		assert.Equal(t, urls[1].longURL, resultURL)
+	})
+}
+
+func TestMemoryStorage_GetStats(t *testing.T) {
+	ctx := context.Background()
+	store, err := NewMemoryStorage(ctx)
+	require.NoError(t, err)
+
+	t.Run("Empty storage", func(t *testing.T) {
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, stats.URLs, "Should have no URLs in empty storage")
+		assert.Equal(t, 0, stats.Users, "Should have no users in empty storage")
+	})
+
+	t.Run("With data", func(t *testing.T) {
+		// Добавляем тестовые URL
+		testData := []struct {
+			shortID string
+			longURL string
+			userID  string
+		}{
+			{"short1", "https://example1.com", "user1"},
+			{"short2", "https://example2.com", "user2"},
+			{"short3", "https://example3.com", "user1"},
+			{"short4", "https://example4.com", "user3"},
+		}
+
+		for _, td := range testData {
+			err := store.SaveURL(ctx, td.shortID, td.longURL, td.userID)
+			require.NoError(t, err)
+		}
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 4, stats.URLs, "Should have 4 URLs")
+		assert.Equal(t, 3, stats.Users, "Should have 3 unique users")
+	})
+
+	t.Run("After URL deletion", func(t *testing.T) {
+		// Помечаем URL как удаленный
+		err := store.MarkURLsAsDeleted(ctx, []string{"short1"}, "user1")
+		require.NoError(t, err)
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 4, stats.URLs, "Should still count deleted URLs")
+		assert.Equal(t, 3, stats.Users, "Should maintain same user count after deletion")
+	})
+
+	t.Run("Concurrent operations", func(t *testing.T) {
+		store, err := NewMemoryStorage(ctx)
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		numGoroutines := 10
+
+		// Запускаем конкурентные операции сохранения и получения статистики
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+
+				shortID := fmt.Sprintf("concurrent%d", i)
+				longURL := fmt.Sprintf("https://example%d.com", i)
+				userID := fmt.Sprintf("user%d", i%3) // Используем только 3 разных пользователя
+
+				// Сохраняем URL
+				err := store.SaveURL(ctx, shortID, longURL, userID)
+				assert.NoError(t, err)
+
+				// Сразу получаем статистику
+				stats, err := store.GetStats(ctx)
+				assert.NoError(t, err)
+				assert.Greater(t, stats.URLs, 0, "Should have some URLs")
+				assert.Greater(t, stats.Users, 0, "Should have some users")
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Проверяем финальную статистику
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, numGoroutines, stats.URLs, "Should have exactly numGoroutines URLs")
+		assert.Equal(t, 3, stats.Users, "Should have exactly 3 users due to modulo operation")
+	})
+
+	t.Run("Stats consistency", func(t *testing.T) {
+		store, err := NewMemoryStorage(ctx)
+		require.NoError(t, err)
+
+		// Сохраняем URL с одним и тем же пользователем
+		urls := []string{"url1", "url2", "url3"}
+		userID := "same_user"
+
+		for i, url := range urls {
+			err := store.SaveURL(ctx, fmt.Sprintf("short%d", i), url, userID)
+			require.NoError(t, err)
+		}
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, len(urls), stats.URLs, "Should have correct URL count")
+		assert.Equal(t, 1, stats.Users, "Should have exactly one user")
+	})
+
+	t.Run("Context cancellation", func(t *testing.T) {
+		store, err := NewMemoryStorage(ctx)
+		require.NoError(t, err)
+
+		// Создаем контекст с отменой
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Сразу отменяем
+
+		// GetStats должен корректно обрабатывать отмененный контекст
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err) // Для in-memory хранилища контекст не влияет на операцию
+		assert.Equal(t, 0, stats.URLs)
+		assert.Equal(t, 0, stats.Users)
 	})
 }

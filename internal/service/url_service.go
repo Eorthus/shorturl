@@ -85,3 +85,8 @@ func (s *URLService) DeleteUserURLs(ctx context.Context, shortIDs []string, user
 func (s *URLService) Ping(ctx context.Context) error {
 	return s.store.Ping(ctx)
 }
+
+// GetStats возвращает статистику сервиса
+func (s *URLService) GetStats(ctx context.Context) (*models.StatsResponse, error) {
+	return s.store.GetStats(ctx)
+}

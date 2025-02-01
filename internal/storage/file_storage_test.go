@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/Eorthus/shorturl/internal/models"
@@ -199,4 +201,81 @@ func splitLines(data []byte) [][]byte {
 		lines = append(lines, data[start:])
 	}
 	return lines
+}
+
+func TestFileStorage_GetStats(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "file_storage_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	tempFile := filepath.Join(tempDir, "test_storage.json")
+	ctx := context.Background()
+
+	store, err := NewFileStorage(ctx, tempFile)
+	require.NoError(t, err)
+
+	t.Run("Empty storage", func(t *testing.T) {
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, stats.URLs)
+		assert.Equal(t, 0, stats.Users)
+	})
+
+	t.Run("With data", func(t *testing.T) {
+		// Добавляем тестовые данные
+		testData := []struct {
+			shortID string
+			longURL string
+			userID  string
+		}{
+			{"test1", "https://example1.com", "user1"},
+			{"test2", "https://example2.com", "user2"},
+			{"test3", "https://example3.com", "user1"},
+		}
+
+		for _, td := range testData {
+			err := store.SaveURL(ctx, td.shortID, td.longURL, td.userID)
+			require.NoError(t, err)
+		}
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, stats.URLs, "Should have 3 URLs")
+		assert.Equal(t, 2, stats.Users, "Should have 2 unique users")
+	})
+
+	t.Run("After deletion", func(t *testing.T) {
+		err := store.MarkURLsAsDeleted(ctx, []string{"test1"}, "user1")
+		require.NoError(t, err)
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, stats.URLs, "Should still count deleted URLs")
+		assert.Equal(t, 2, stats.Users, "Should maintain user count")
+	})
+
+	t.Run("Concurrent access", func(t *testing.T) {
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				shortID := fmt.Sprintf("concurrent%d", i)
+				userID := fmt.Sprintf("user%d", i%3)
+				err := store.SaveURL(ctx, shortID, fmt.Sprintf("https://example%d.com", i), userID)
+				assert.NoError(t, err)
+
+				stats, err := store.GetStats(ctx)
+				assert.NoError(t, err)
+				assert.Greater(t, stats.URLs, 0)
+				assert.Greater(t, stats.Users, 0)
+			}(i)
+		}
+		wg.Wait()
+
+		stats, err := store.GetStats(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, 13, stats.URLs) // 3 initial + 10 concurrent
+		assert.Equal(t, 3, stats.Users) // users are reused with modulo 3
+	})
 }

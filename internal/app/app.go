@@ -4,7 +4,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,9 +11,9 @@ import (
 
 	"github.com/Eorthus/shorturl/internal/api"
 	"github.com/Eorthus/shorturl/internal/config"
+	"github.com/Eorthus/shorturl/internal/server"
 	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
-	"github.com/Eorthus/shorturl/internal/tls"
 	"go.uber.org/zap"
 )
 
@@ -22,13 +21,15 @@ import (
 type Application struct {
 	cfg     *config.Config
 	logger  *zap.Logger
-	srv     *http.Server
+	server  *server.Server
 	storage storage.Storage
 }
 
 // New создает новое приложение
 func New(cfg *config.Config, logger *zap.Logger) (*Application, error) {
-	ctx := context.Background()
+	// Создаем контекст с таймаутом для инициализации
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	// Инициализация хранилища
 	store, err := storage.InitStorage(ctx, cfg)
@@ -43,15 +44,12 @@ func New(cfg *config.Config, logger *zap.Logger) (*Application, error) {
 	router := api.NewRouter(cfg, urlService, logger, store)
 
 	// Создаем HTTP сервер
-	srv := &http.Server{
-		Addr:    cfg.ServerAddress,
-		Handler: router,
-	}
+	srv := server.New(cfg, router, logger)
 
 	return &Application{
 		cfg:     cfg,
 		logger:  logger,
-		srv:     srv,
+		server:  srv,
 		storage: store,
 	}, nil
 }
@@ -71,33 +69,7 @@ func (a *Application) Run(ctx context.Context) error {
 
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		a.logger.Info("Starting server",
-			zap.String("address", a.cfg.ServerAddress),
-			zap.String("base_url", a.cfg.BaseURL),
-			zap.String("file_storage_path", a.cfg.FileStoragePath),
-			zap.String("database_dsn", a.cfg.DatabaseDSN),
-			zap.Bool("https_enabled", a.cfg.EnableHTTPS),
-		)
-
-		var err error
-		if a.cfg.EnableHTTPS {
-			// Проверяем наличие сертификата и ключа
-			if err = tls.EnsureCertificateExists(a.cfg.CertFile, a.cfg.KeyFile); err != nil {
-				errChan <- fmt.Errorf("failed to ensure TLS certificates: %w", err)
-				return
-			}
-
-			a.logger.Info("Starting HTTPS server",
-				zap.String("cert_file", a.cfg.CertFile),
-				zap.String("key_file", a.cfg.KeyFile),
-			)
-			err = a.srv.ListenAndServeTLS(a.cfg.CertFile, a.cfg.KeyFile)
-		} else {
-			a.logger.Info("Starting HTTP server")
-			err = a.srv.ListenAndServe()
-		}
-
-		if err != nil && err != http.ErrServerClosed {
+		if err := a.server.Run(ctx); err != nil {
 			errChan <- err
 		}
 	}()
@@ -118,16 +90,22 @@ func (a *Application) Run(ctx context.Context) error {
 
 // Shutdown выполняет корректное завершение работы приложения
 func (a *Application) Shutdown() error {
-	// Контекст с таймаутом для graceful shutdown
+	// Создаем контекст с таймаутом для graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Останавливаем HTTP сервер
-	if err := a.srv.Shutdown(shutdownCtx); err != nil {
-		a.logger.Error("Server shutdown error", zap.Error(err))
+	// Останавливаем сервер
+	if err := a.server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server shutdown error: %w", err)
 	}
 
-	a.logger.Info("Server shutdown complete")
+	// Закрываем хранилище, если оно реализует io.Closer
+	if closer, ok := a.storage.(interface{ Close() error }); ok {
+		if err := closer.Close(); err != nil {
+			return fmt.Errorf("storage close error: %w", err)
+		}
+	}
+
+	a.logger.Info("Application shutdown complete")
 	return nil
 }

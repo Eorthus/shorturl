@@ -15,7 +15,7 @@ import (
 )
 
 func TestHandlePost(t *testing.T) {
-	r, store := setupRouter(t)
+	r, store := setupRouter(t, "")
 
 	tests := []struct {
 		name           string
@@ -59,7 +59,7 @@ func TestHandlePost(t *testing.T) {
 }
 
 func TestHandleGet(t *testing.T) {
-	r, store := setupRouter(t)
+	r, store := setupRouter(t, "")
 
 	ctx := context.Background()
 	shortID := "testid"
@@ -96,7 +96,7 @@ func TestHandleGet(t *testing.T) {
 }
 
 func TestHandleJSONPost(t *testing.T) {
-	r, store := setupRouter(t)
+	r, store := setupRouter(t, "")
 
 	tests := []struct {
 		name           string
@@ -166,7 +166,7 @@ func TestHandleJSONPost(t *testing.T) {
 }
 
 func TestHandlePing(t *testing.T) {
-	r, _ := setupRouter(t)
+	r, _ := setupRouter(t, "")
 
 	req, err := http.NewRequest("GET", "/ping", nil)
 	require.NoError(t, err)

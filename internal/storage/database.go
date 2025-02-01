@@ -178,3 +178,22 @@ func (s *DatabaseStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []stri
 
 	return nil
 }
+
+// GetStats собирает статистику
+func (s *DatabaseStorage) GetStats(ctx context.Context) (*models.StatsResponse, error) {
+	var stats models.StatsResponse
+
+	// Получаем количество URL
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT short_id) FROM urls").Scan(&stats.URLs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Получаем количество уникальных пользователей
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT user_id) FROM urls").Scan(&stats.Users)
+	if err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}

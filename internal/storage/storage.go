@@ -51,14 +51,17 @@ type Storage interface {
 
 	// MarkURLsAsDeleted помечает указанные URL как удаленные для пользователя.
 	MarkURLsAsDeleted(ctx context.Context, shortIDs []string, userID string) error
+
+	// GetStats возвращает статистику
+	GetStats(ctx context.Context) (*models.StatsResponse, error)
 }
 
 // InitStorage инициализирует хранилище в зависимости от конфигурации
 func InitStorage(ctx context.Context, cfg *config.Config) (Storage, error) {
-	if cfg.DatabaseDSN != "" {
-		return NewDatabaseStorage(ctx, cfg.DatabaseDSN)
-	} else if cfg.FileStoragePath != "" {
-		return NewFileStorage(ctx, cfg.FileStoragePath)
+	if cfg.Storage.DatabaseDSN != "" {
+		return NewDatabaseStorage(ctx, cfg.Storage.DatabaseDSN)
+	} else if cfg.Storage.FileStoragePath != "" {
+		return NewFileStorage(ctx, cfg.Storage.FileStoragePath)
 	} else {
 		return NewMemoryStorage(ctx)
 	}

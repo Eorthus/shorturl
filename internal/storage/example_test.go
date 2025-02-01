@@ -176,8 +176,10 @@ func Example_initStorage() {
 	defer os.Remove(tmpFile.Name())
 
 	cfg := &config.Config{
-		DatabaseDSN:     "",
-		FileStoragePath: tmpFile.Name(),
+		Storage: config.StorageConfig{
+			DatabaseDSN:     "",
+			FileStoragePath: tmpFile.Name(),
+		},
 	}
 
 	store, err := storage.InitStorage(context.Background(), cfg)

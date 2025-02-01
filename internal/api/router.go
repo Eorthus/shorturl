@@ -39,6 +39,11 @@ func NewRouter(cfg *config.Config, urlService *service.URLService, logger *zap.L
 		r.Post("/api/shorten/batch", handler.HandleBatchShorten)
 	})
 
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.TrustedSubnetMiddleware(cfg.Server.TrustedSubnet))
+		r.Get("/api/internal/stats", handler.HandleStats)
+	})
+
 	r.Delete("/api/user/urls", handler.HandleDeleteURLs)
 
 	return r

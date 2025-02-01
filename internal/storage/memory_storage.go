@@ -129,3 +129,19 @@ func (ms *MemoryStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []strin
 
 	return nil
 }
+
+// GetStats собирает статистику
+func (ms *MemoryStorage) GetStats(ctx context.Context) (*models.StatsResponse, error) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	uniqueUsers := make(map[string]struct{})
+	for userID := range ms.userURLs {
+		uniqueUsers[userID] = struct{}{}
+	}
+
+	return &models.StatsResponse{
+		URLs:  len(ms.shortToLong),
+		Users: len(uniqueUsers),
+	}, nil
+}
