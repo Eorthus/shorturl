@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package urlshortener.v1;
+
+option go_package = "github.com/Eorthus/shorturl/internal/grpc/pb";
+
+service URLShortener {
+  // Сокращение URL
+  rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse) {}
+  
+  // Получение оригинального URL
+  rpc GetOriginalURL(GetOriginalURLRequest) returns (GetOriginalURLResponse) {}
+  
+  // Пакетное сокращение URL
+  rpc BatchShortenURL(BatchShortenRequest) returns (BatchShortenResponse) {}
+  
+  // Получение URL пользователя
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse) {}
+  
+  // Удаление URL
+  rpc DeleteURLs(DeleteURLsRequest) returns (DeleteURLsResponse) {}
+  
+  // Получение статистики
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
+  
+  // Проверка доступности сервера
+  rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+// Запросы и ответы для каждого метода
+message ShortenURLRequest {
+  string url = 1;
+  string user_id = 2;
+}
+
+message ShortenURLResponse {
+  string short_url = 1;
+}
+
+message GetOriginalURLRequest {
+  string short_id = 1;
+}
+
+message GetOriginalURLResponse {
+  string original_url = 1;
+  bool is_deleted = 2;
+}
+
+message BatchShortenRequest {
+  message BatchURL {
+    string correlation_id = 1;
+    string original_url = 2;
+  }
+  repeated BatchURL urls = 1;
+  string user_id = 2;
+}
+
+message BatchShortenResponse {
+  message BatchResult {
+    string correlation_id = 1;
+    string short_url = 2;
+  }
+  repeated BatchResult results = 1;
+}
+
+message GetUserURLsRequest {
+  string user_id = 1;
+}
+
+message GetUserURLsResponse {
+  message URLData {
+    string short_url = 1;
+    string original_url = 2;
+  }
+  repeated URLData urls = 1;
+}
+
+message DeleteURLsRequest {
+  repeated string short_ids = 1;
+  string user_id = 2;
+}
+
+message DeleteURLsResponse {
+  bool success = 1;
+}
+
+message GetStatsRequest {}
+
+message GetStatsResponse {
+  int32 urls = 1;
+  int32 users = 2;
+}
+
+message PingRequest {}
+
+message PingResponse {
+  string status = 1;
+}

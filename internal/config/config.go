@@ -3,6 +3,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 
@@ -35,7 +36,8 @@ type Config struct {
 	Server     ServerConfig
 	Storage    StorageConfig
 	TLS        TLSConfig
-	ConfigFile string `env:"CONFIG" envDefault:""`
+	GRPC       GRPCConfig // добавляем поле для gRPC конфигурации
+	ConfigFile string     `env:"CONFIG" envDefault:""`
 }
 
 // ConfigBuilder реализует паттерн строителя для конфигурации
@@ -89,6 +91,9 @@ func (b *ConfigBuilder) FromEnv() (*ConfigBuilder, error) {
 	if err := env.Parse(&b.config.TLS); err != nil {
 		return nil, err
 	}
+	if err := env.Parse(&b.config.GRPC); err != nil { // Добавляем парсинг GRPC конфига
+		return nil, err
+	}
 	if err := env.Parse(b.config); err != nil {
 		return nil, err
 	}
@@ -115,6 +120,11 @@ func (b *ConfigBuilder) FromFlags() *ConfigBuilder {
 	flag.StringVar(&b.config.ConfigFile, "c", b.config.ConfigFile, "Path to configuration file")
 	flag.StringVar(&b.config.ConfigFile, "config", b.config.ConfigFile, "Path to configuration file")
 
+	// Флаги для gRPC
+	flag.StringVar(&b.config.GRPC.Address, "grpc-addr", b.config.GRPC.Address, "gRPC server address")
+	flag.IntVar(&b.config.GRPC.MaxMessageSize, "grpc-max-size", b.config.GRPC.MaxMessageSize, "Maximum message size for gRPC")
+	flag.BoolVar(&b.config.GRPC.EnableReflection, "grpc-reflection", b.config.GRPC.EnableReflection, "Enable reflection for gRPC")
+
 	flag.Parse()
 	return b
 }
@@ -136,9 +146,9 @@ func (b *ConfigBuilder) FromJSON(filename string) (*ConfigBuilder, error) {
 	}
 
 	if jsonCfg != nil {
-		b.config.Server = jsonCfg.Server
-		b.config.Storage = jsonCfg.Storage
-		b.config.TLS = jsonCfg.TLS
+		fmt.Printf("Applying JSON config to builder: %+v\n", jsonCfg)
+		b.config.ApplyJSON(jsonCfg)
+		fmt.Printf("Config after applying JSON: %+v\n", b.config)
 	}
 
 	return b, nil

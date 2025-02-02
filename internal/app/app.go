@@ -11,6 +11,7 @@ import (
 
 	"github.com/Eorthus/shorturl/internal/api"
 	"github.com/Eorthus/shorturl/internal/config"
+	grpcserver "github.com/Eorthus/shorturl/internal/grpc/server"
 	"github.com/Eorthus/shorturl/internal/server"
 	"github.com/Eorthus/shorturl/internal/service"
 	"github.com/Eorthus/shorturl/internal/storage"
@@ -19,10 +20,11 @@ import (
 
 // Application представляет собой структуру приложения
 type Application struct {
-	cfg     *config.Config
-	logger  *zap.Logger
-	server  *server.Server
-	storage storage.Storage
+	cfg        *config.Config
+	logger     *zap.Logger
+	httpServer *server.Server
+	grpcServer *grpcserver.Server
+	storage    storage.Storage
 }
 
 // New создает новое приложение
@@ -40,17 +42,21 @@ func New(cfg *config.Config, logger *zap.Logger) (*Application, error) {
 	// Инициализация сервиса
 	urlService := service.NewURLService(store)
 
-	// Инициализация роутера
+	// Инициализация HTTP роутера
 	router := api.NewRouter(cfg, urlService, logger, store)
 
 	// Создаем HTTP сервер
-	srv := server.New(cfg, router, logger)
+	httpSrv := server.New(cfg, router, logger)
+
+	// Создаем gRPC сервер
+	grpcSrv := grpcserver.New(cfg, urlService, logger)
 
 	return &Application{
-		cfg:     cfg,
-		logger:  logger,
-		server:  srv,
-		storage: store,
+		cfg:        cfg,
+		logger:     logger,
+		httpServer: httpSrv,
+		grpcServer: grpcSrv,
+		storage:    store,
 	}, nil
 }
 
@@ -64,28 +70,65 @@ func (a *Application) Run(ctx context.Context) error {
 		syscall.SIGQUIT,
 	)
 
-	// Канал для ошибок сервера
-	errChan := make(chan error, 1)
+	// Каналы для ошибок серверов
+	httpErrChan := make(chan error, 1)
+	grpcErrChan := make(chan error, 1)
 
-	// Запускаем сервер в отдельной горутине
+	// Контекст с отменой для серверов
+	serverCtx, serverCancel := context.WithCancel(ctx)
+	defer serverCancel()
+
+	// Запускаем HTTP сервер
 	go func() {
-		if err := a.server.Run(ctx); err != nil {
-			errChan <- err
+		a.logger.Info("Starting HTTP server",
+			zap.String("address", a.cfg.Server.ServerAddress),
+		)
+		if err := a.httpServer.Run(serverCtx); err != nil {
+			a.logger.Error("HTTP server error", zap.Error(err))
+			httpErrChan <- err
+		}
+	}()
+
+	// Запускаем gRPC сервер
+	go func() {
+		a.logger.Info("Starting gRPC server",
+			zap.String("address", a.cfg.GRPC.Address),
+		)
+		if err := a.grpcServer.Run(serverCtx); err != nil {
+			a.logger.Error("gRPC server error", zap.Error(err))
+			grpcErrChan <- err
 		}
 	}()
 
 	// Ожидаем сигнал завершения или ошибку
+	var shutdownErr error
 	select {
 	case sig := <-sigChan:
 		a.logger.Info("Received shutdown signal", zap.String("signal", sig.String()))
-	case err := <-errChan:
-		a.logger.Error("Server error", zap.Error(err))
-		return fmt.Errorf("server error: %w", err)
+	case err := <-httpErrChan:
+		a.logger.Error("HTTP server critical error", zap.Error(err))
+		shutdownErr = fmt.Errorf("http server error: %w", err)
+	case err := <-grpcErrChan:
+		a.logger.Error("gRPC server critical error", zap.Error(err))
+		shutdownErr = fmt.Errorf("grpc server error: %w", err)
 	case <-ctx.Done():
 		a.logger.Info("Shutdown requested through context")
 	}
 
-	return a.Shutdown()
+	// Запускаем процедуру graceful shutdown
+	if err := a.Shutdown(); err != nil {
+		// Если shutdown завершился с ошибкой, логируем ее
+		a.logger.Error("Error during shutdown", zap.Error(err))
+		// Если у нас уже есть ошибка от серверов, возвращаем ее,
+		// иначе возвращаем ошибку shutdown
+		if shutdownErr != nil {
+			return shutdownErr
+		}
+		return fmt.Errorf("shutdown error: %w", err)
+	}
+
+	// Если у нас есть ошибка от серверов, возвращаем ее
+	return shutdownErr
 }
 
 // Shutdown выполняет корректное завершение работы приложения
@@ -94,9 +137,25 @@ func (a *Application) Shutdown() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Останавливаем сервер
-	if err := a.server.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("server shutdown error: %w", err)
+	// Останавливаем HTTP сервер
+	if err := a.httpServer.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("http server shutdown error: %w", err)
+	}
+	a.logger.Info("HTTP server shutdown complete")
+
+	// Останавливаем gRPC сервер
+	stopped := make(chan struct{})
+	go func() {
+		a.grpcServer.Stop()
+		close(stopped)
+	}()
+
+	// Ждем остановки gRPC сервера с таймаутом
+	select {
+	case <-stopped:
+		a.logger.Info("gRPC server shutdown complete")
+	case <-shutdownCtx.Done():
+		return fmt.Errorf("grpc server shutdown timeout")
 	}
 
 	// Закрываем хранилище, если оно реализует io.Closer
@@ -104,6 +163,7 @@ func (a *Application) Shutdown() error {
 		if err := closer.Close(); err != nil {
 			return fmt.Errorf("storage close error: %w", err)
 		}
+		a.logger.Info("Storage shutdown complete")
 	}
 
 	a.logger.Info("Application shutdown complete")
