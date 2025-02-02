@@ -19,7 +19,9 @@ import (
 func Example_shortenURL() {
 	// Инициализация зависимостей
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 	store, _ := storage.NewMemoryStorage(context.Background())
 	urlService := service.NewURLService(store)
@@ -52,7 +54,9 @@ func Example_shortenURL() {
 
 func Example_shortenURLJSON() {
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 	store, _ := storage.NewMemoryStorage(context.Background())
 	urlService := service.NewURLService(store)
@@ -91,7 +95,9 @@ func Example_shortenURLJSON() {
 
 func Example_getUserURLs() {
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 	store, _ := storage.NewMemoryStorage(context.Background())
 	urlService := service.NewURLService(store)
@@ -124,7 +130,9 @@ func Example_getUserURLs() {
 
 func Example_deleteURLs() {
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 	store, _ := storage.NewMemoryStorage(context.Background())
 	urlService := service.NewURLService(store)
@@ -159,7 +167,9 @@ func Example_deleteURLs() {
 
 func Example_batchShorten() {
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 	store, _ := storage.NewMemoryStorage(context.Background())
 	urlService := service.NewURLService(store)

@@ -51,6 +51,16 @@ func (m *MockStorage) MarkURLsAsDeleted(ctx context.Context, shortIDs []string, 
 	return args.Error(0)
 }
 
+func (m *MockStorage) GetStats(ctx context.Context) (*models.StatsResponse, error) {
+	args := m.Called(ctx)
+	// Проверяем первый аргумент на nil
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	// Явно приводим к нужному типу
+	return args.Get(0).(*models.StatsResponse), args.Error(1)
+}
+
 func TestDBContextMiddleware(t *testing.T) {
 	mockStore := new(MockStorage)
 	middleware := DBContextMiddleware(mockStore)

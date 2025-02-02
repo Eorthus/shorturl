@@ -20,23 +20,35 @@ func TestLoadJSON(t *testing.T) {
 		content     string
 		filename    string
 		shouldError bool
-		want        *JSONConfig
+		want        *Config
 	}{
 		{
-			name:        "Valid config",
-			filename:    "config.json",
-			content:     `{"server_address": "localhost:8080", "base_url": "http://localhost", "enable_https": true}`,
+			name:     "Valid config",
+			filename: "config.json",
+			content: `{
+				"server": {
+					"server_address": "localhost:8080",
+					"base_url": "http://localhost"
+				},
+				"tls": {
+					"enable_https": true
+				}
+			}`,
 			shouldError: false,
-			want: &JSONConfig{
-				ServerAddress: "localhost:8080",
-				BaseURL:       "http://localhost",
-				EnableHTTPS:   true,
+			want: &Config{
+				Server: ServerConfig{
+					ServerAddress: "localhost:8080",
+					BaseURL:       "http://localhost",
+				},
+				TLS: TLSConfig{
+					EnableHTTPS: true,
+				},
 			},
 		},
 		{
 			name:        "Invalid JSON",
 			filename:    "invalid.json",
-			content:     `{"server_address": "localhost:8080"`,
+			content:     `{"server": {`,
 			shouldError: true,
 			want:        nil,
 		},
@@ -72,50 +84,70 @@ func TestConfig_ApplyJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		base     *Config
-		json     *JSONConfig
+		json     *Config
 		expected *Config
 	}{
 		{
 			name: "Apply all fields",
 			base: &Config{
-				ServerAddress: "default:8080",
-				BaseURL:       "http://default",
+				Server: ServerConfig{
+					ServerAddress: "default:8080",
+					BaseURL:       "http://default",
+				},
 			},
-			json: &JSONConfig{
-				ServerAddress: "new:8080",
-				BaseURL:       "http://new",
-				EnableHTTPS:   true,
+			json: &Config{
+				Server: ServerConfig{
+					ServerAddress: "new:8080",
+					BaseURL:       "http://new",
+				},
+				TLS: TLSConfig{
+					EnableHTTPS: true,
+				},
 			},
 			expected: &Config{
-				ServerAddress: "new:8080",
-				BaseURL:       "http://new",
-				EnableHTTPS:   true,
+				Server: ServerConfig{
+					ServerAddress: "new:8080",
+					BaseURL:       "http://new",
+				},
+				TLS: TLSConfig{
+					EnableHTTPS: true,
+				},
 			},
 		},
 		{
 			name: "Apply partial fields",
 			base: &Config{
-				ServerAddress: "default:8080",
-				BaseURL:       "http://default",
+				Server: ServerConfig{
+					ServerAddress: "default:8080",
+					BaseURL:       "http://default",
+				},
 			},
-			json: &JSONConfig{
-				ServerAddress: "new:8080",
+			json: &Config{
+				Server: ServerConfig{
+					ServerAddress: "new:8080",
+				},
 			},
 			expected: &Config{
-				ServerAddress: "new:8080",
-				BaseURL:       "http://default",
+				Server: ServerConfig{
+					ServerAddress: "new:8080",
+					BaseURL:       "http://default",
+				},
 			},
 		},
 		{
 			name: "Empty JSON config",
 			base: &Config{
-				ServerAddress: "default:8080",
-				BaseURL:       "http://default",
+				Server: ServerConfig{
+					ServerAddress: "default:8080",
+					BaseURL:       "http://default",
+				},
 			},
 			json: nil,
 			expected: &Config{
-				ServerAddress: "default:8080",
-				BaseURL:       "http://default",
+				Server: ServerConfig{
+					ServerAddress: "default:8080",
+					BaseURL:       "http://default",
+				},
 			},
 		},
 	}
@@ -158,7 +190,11 @@ func TestJSONFileHandling(t *testing.T) {
 		},
 	}
 
-	config := `{"server_address": "localhost:8080"}`
+	config := `{
+		"server": {
+			"server_address": "localhost:8080"
+		}
+	}`
 
 	for _, p := range paths {
 		t.Run(p.name, func(t *testing.T) {
@@ -176,7 +212,7 @@ func TestJSONFileHandling(t *testing.T) {
 			if p.isValid {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
-				assert.Equal(t, "localhost:8080", result.ServerAddress)
+				assert.Equal(t, "localhost:8080", result.Server.ServerAddress)
 			} else {
 				assert.Error(t, err)
 			}

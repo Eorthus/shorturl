@@ -8,31 +8,18 @@ import (
 	"path/filepath"
 )
 
-// JsonConfig представляет структуру JSON конфигурации
-type JSONConfig struct {
-	ServerAddress   string `json:"server_address"`
-	BaseURL         string `json:"base_url"`
-	FileStoragePath string `json:"file_storage_path"`
-	DatabaseDSN     string `json:"database_dsn"`
-	EnableHTTPS     bool   `json:"enable_https"`
-	CertFile        string `json:"cert_file"`
-	KeyFile         string `json:"key_file"`
-}
-
 // LoadJSON загружает конфигурацию из JSON файла
-func LoadJSON(filename string) (*JSONConfig, error) {
+func LoadJSON(filename string) (*Config, error) {
 	if filename == "" {
 		return nil, nil
 	}
 
-	// Получаем абсолютный путь для отладки
 	absPath, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, fmt.Errorf("error getting absolute path for %s: %w", filename, err)
 	}
 	fmt.Printf("Attempting to load config from: %s\n", absPath)
 
-	// Проверяем существование файла
 	if _, err := os.Stat(filename); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("configuration file %s does not exist (absolute path: %s)", filename, absPath)
@@ -40,13 +27,12 @@ func LoadJSON(filename string) (*JSONConfig, error) {
 		return nil, err
 	}
 
-	// Читаем файл целиком
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	var cfg JSONConfig
+	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("error parsing JSON config: %w", err)
 	}
@@ -56,31 +42,47 @@ func LoadJSON(filename string) (*JSONConfig, error) {
 }
 
 // ApplyJSON применяет настройки из JSON к основной конфигурации
-func (cfg *Config) ApplyJSON(jsonCfg *JSONConfig) {
+func (cfg *Config) ApplyJSON(jsonCfg *Config) {
 	if jsonCfg == nil {
 		return
 	}
 
-	// Применяем только непустые значения из JSON
-	if jsonCfg.ServerAddress != "" {
-		cfg.ServerAddress = jsonCfg.ServerAddress
+	// Применяем настройки сервера
+	if jsonCfg.Server.ServerAddress != "" {
+		cfg.Server.ServerAddress = jsonCfg.Server.ServerAddress
 	}
-	if jsonCfg.BaseURL != "" {
-		cfg.BaseURL = jsonCfg.BaseURL
+	if jsonCfg.Server.BaseURL != "" {
+		cfg.Server.BaseURL = jsonCfg.Server.BaseURL
 	}
-	if jsonCfg.FileStoragePath != "" {
-		cfg.FileStoragePath = jsonCfg.FileStoragePath
+	if jsonCfg.Server.TrustedSubnet != "" {
+		cfg.Server.TrustedSubnet = jsonCfg.Server.TrustedSubnet
 	}
-	if jsonCfg.DatabaseDSN != "" {
-		cfg.DatabaseDSN = jsonCfg.DatabaseDSN
+
+	// Применяем настройки TLS
+	if jsonCfg.TLS.EnableHTTPS {
+		cfg.TLS.EnableHTTPS = true
 	}
-	if jsonCfg.EnableHTTPS {
-		cfg.EnableHTTPS = true
+	if jsonCfg.TLS.CertFile != "" {
+		cfg.TLS.CertFile = jsonCfg.TLS.CertFile
 	}
-	if jsonCfg.CertFile != "" {
-		cfg.CertFile = jsonCfg.CertFile
+	if jsonCfg.TLS.KeyFile != "" {
+		cfg.TLS.KeyFile = jsonCfg.TLS.KeyFile
 	}
-	if jsonCfg.KeyFile != "" {
-		cfg.KeyFile = jsonCfg.KeyFile
+
+	// Применяем настройки хранилища
+	if jsonCfg.Storage.FileStoragePath != "" {
+		cfg.Storage.FileStoragePath = jsonCfg.Storage.FileStoragePath
 	}
+	if jsonCfg.Storage.DatabaseDSN != "" {
+		cfg.Storage.DatabaseDSN = jsonCfg.Storage.DatabaseDSN
+	}
+
+	// Применяем настройки GRPC
+	if jsonCfg.GRPC.Address != "" {
+		cfg.GRPC.Address = jsonCfg.GRPC.Address
+	}
+	if jsonCfg.GRPC.MaxMessageSize > 0 {
+		cfg.GRPC.MaxMessageSize = jsonCfg.GRPC.MaxMessageSize
+	}
+	cfg.GRPC.EnableReflection = jsonCfg.GRPC.EnableReflection
 }

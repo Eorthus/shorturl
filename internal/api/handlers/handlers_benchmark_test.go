@@ -22,7 +22,9 @@ import (
 // setupBenchmarkHandler создает handler для тестов
 func setupBenchmarkHandler(b *testing.B) (*URLHandler, *chi.Mux) {
 	cfg := &config.Config{
-		BaseURL: "http://localhost:8080",
+		Server: config.ServerConfig{
+			BaseURL: "http://localhost:8080",
+		},
 	}
 
 	logger, err := zap.NewDevelopment()

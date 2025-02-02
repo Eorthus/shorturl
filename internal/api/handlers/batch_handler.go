@@ -29,7 +29,7 @@ func (h *URLHandler) HandleBatchShorten(w http.ResponseWriter, r *http.Request) 
 
 	// Преобразуем короткие URL в полные URL
 	for i := range responses {
-		responses[i].ShortURL = h.cfg.BaseURL + "/" + responses[i].ShortURL
+		responses[i].ShortURL = h.cfg.Server.BaseURL + "/" + responses[i].ShortURL
 	}
 
 	if len(requests) == 0 {
@@ -67,7 +67,7 @@ func (h *URLHandler) HandleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range urls {
-		urls[i].ShortURL = h.cfg.BaseURL + "/" + urls[i].ShortURL
+		urls[i].ShortURL = h.cfg.Server.BaseURL + "/" + urls[i].ShortURL
 	}
 
 	json.NewEncoder(w).Encode(urls)

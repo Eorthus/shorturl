@@ -36,7 +36,7 @@ func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == apperrors.ErrURLExists {
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(h.cfg.BaseURL + "/" + shortID))
+			w.Write([]byte(h.cfg.Server.BaseURL + "/" + shortID))
 			return
 		}
 		apperrors.HandleHTTPError(w, err, h.logger)
@@ -45,7 +45,7 @@ func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(h.cfg.BaseURL + "/" + shortID))
+	w.Write([]byte(h.cfg.Server.BaseURL + "/" + shortID))
 }
 
 // HandleGet обрабатывает GET-запросы для получения оригинального URL.
@@ -102,7 +102,7 @@ func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(struct {
 				Result string `json:"result"`
 			}{
-				Result: h.cfg.BaseURL + "/" + shortID,
+				Result: h.cfg.Server.BaseURL + "/" + shortID,
 			})
 			return
 		}
@@ -111,7 +111,7 @@ func (h *URLHandler) HandleJSONPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := models.ShortenResponse{
-		Result: h.cfg.BaseURL + "/" + shortID,
+		Result: h.cfg.Server.BaseURL + "/" + shortID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
